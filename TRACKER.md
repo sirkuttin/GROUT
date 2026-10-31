@@ -1,0 +1,144 @@
+# ReleaseDock tracker
+
+## 2026-10-30 — First working version
+
+- User requested building a Windows alternative to Obtainium for apps installed from GitHub.
+- Implementation defaults: native WPF/.NET, public stable releases, manual installed-version tracking and downloads. Working name: ReleaseDock.
+- Built: persistent library, release checks on startup and hourly while open, asset chooser, download progress, size/checksum verification, release links and notes, removal, CLI help, isolated self-tests and preview rendering.
+- Later candidates: tray notifications, startup checks, optional GitHub authentication, portable app replacement, and installer integration.
+- No outstanding user decisions.
+- Validation: Release build with zero warnings/errors; isolated tests passed for URL validation, persistence, release parsing, HTTP 404 handling, download integrity and preservation of existing files on checksum failure. Packaged executable self-tests passed. Window rendered and visually inspected. Real GitHub release endpoint confirmed accessible; interactive end-to-end installation has not been tested.
+
+## Preview release fix — 0.1.1
+
+- Screenshot showed `bearstonem/d2r-pcvr` failing because its releases are prereleases and the stable-only GitHub endpoint returns 404.
+- Added a persistent per-app **Include preview releases** setting and immediate recheck when toggled. Stable-only remains the default. Preview mode chooses the newest publication among the 100 returned releases, excluding drafts.
+- Improved stable-only 404 text to explain the preview setting and URL check.
+- Added regression coverage for preview selection, draft exclusion, publication sorting, empty lists, and setting persistence. Added a read-only live repository diagnostic command.
+
+## Optional local version reconciliation — 0.2.0
+
+- User requested optional install-location version detection while retaining manual marking. Supplied D2R PCVR installation folder.
+- Read-only inspection found `release-manifest.json` with exact tag `v0.3.30-windows-preview`; a bundled launcher installer reports an older `0.3.5`, confirming arbitrary EXE selection would be misleading.
+- Added persisted install location and opt-in automatic reconciliation, folder/file pickers, manifest and EXE metadata readers, and visible detection source/errors. Checks run on release fetch, focus and a one-minute local timer. Manual marking/saving pauses automatic reconciliation.
+- Conservative numeric matching allows `1.2.3.0` to match `v1.2.3`, preserving preview suffix distinctions. Failed detection retains the previous version and marks it unverified.
+- Regression tests cover local updates, corrupt/missing files, manual mode, tag precedence, ambiguous folders, numeric matching, persistence and EXE resources. Read-only diagnostic confirmed the supplied D2R folder detects `v0.3.30-windows-preview`.
+- Common Windows sources discussed: EXE version resources, installer registry DisplayVersion, package metadata, app manifests. Registry/package detection remains future work.
+
+## UX review — 0.2.1
+
+- User requested **Update** instead of **Download file**, enabled only for available updates. Implemented label, centralized eligibility rule, and handler guard; unknown/current/unverified/failed-check states cannot update. Different tags remain the existing update heuristic.
+- Polling remains fixed hourly while open, without notifications. UX proposals are tracked in `review/DECISIONS.md`.
+
+## UX decisions received — 2026-10-30
+
+- Decision 1: **B approved** — configurable polling, daily default; manual/hourly/every six hours/daily choices; manual checks and last/next check display. Approved, not yet implemented.
+- Decision 2: **A approved** — tray and Windows notifications, deduplicated by app/release; close hides to tray, Exit stops checking; quiet setting and separate opt-in Windows startup. Approved, not yet implemented.
+- Decision 3: further discussion requested; no guided-installation choice approved. Decisions page now contains only this open question. Recommended explicit per-app installer handoff with independent installed-version reconciliation.
+
+## Update routing clarified — 2026-10-30
+
+- User wants EXE-to-EXE updates to replace the selected installed EXE where appropriate.
+- For a configured installation folder, user wants the selected EXE/MSI run as an installer, or a selected ZIP extracted to the folder.
+- Record this as the desired update routing, not implemented yet. Keep version-source selection distinct from update destination when the selected source is a JSON manifest.
+- Open detail: staged replacement/extraction, backups, archive layout mapping and treatment of existing config/save files. Proposed implementation uses explicit per-app update method, bounded extraction and no deletion of files absent from an archive.
+
+## Add App setup proposal — 2026-10-30
+
+- User proposed removing the main-window add-repository textbox, renaming Track app to Add App, and opening a guided setup of roughly two screens. Asked for thoughts; setup flow is under discussion, not implemented.
+- Proposed screen 1: repository validation/release discovery and already-installed versus new-install intent. Screen 2: conditional location/asset/update-method/version fields and an explicit action summary.
+- Updated open decisions to cover two-screen structure and the still-unresolved replacement/extraction policy. Previous daily-polling and tray approvals remain recorded above.
+
+## UX specialist review — 2026-10-30
+
+- User explicitly requested sending the screen design to a UX designer. Delegated to a UX design agent; review completed and saved in `review/ux-design-review.md`.
+- Reviewer recommends two screens with conditional second-screen content; existing apps identify install location before release asset selection. New installer flows discover the installed folder after installer handoff.
+- Keep manual detection fallback and marking visible. No automatic EXE classification solely by extension. Keep global preferences outside Add App.
+- Reviewer proposed deferring automatic ZIP application until conflict/layout policy is settled. This is advice, not an approved change in scope.
+
+## Approved implementation — 0.3.0
+
+- User approved making all discussed changes, including the two-screen Add App flow and configured update methods. No open decisions remain for this release.
+- Removed the main-window URL field; added two-screen repository lookup and existing/new install setup, preview channel selection, duplicate handling, manual version fallback, conditional destination controls and visible update-method summaries. Installer completion uses the same second screen to establish the installed location.
+- Added daily-default configurable polling (manual/hourly/six-hourly/daily), persisted schedule/cache, last/next display, staggered requests and GitHub rate-limit backoff.
+- Added native Windows tray lifecycle, deduplicated update notifications, quiet mode, first-close explanation, explicit Exit and separate opt-in current-user Windows startup. Normal launches use a single-instance mutex.
+- Implemented configured installer handoff, exact portable EXE replacement and reviewed ZIP extraction. ZIP mapping can remove one outer directory; per-file selections preserve likely settings/save files by default. No absent-file deletion. File updates use backups, preflight locks, transactional replacement, automatic rollback on failure and explicit recovery. Linked/escaping/ambiguous archive paths are rejected.
+- Update remains unavailable for current/unknown/unverified/failed states and needs a matching configured asset. Manual marking remains available. Installation state is reconciled independently of download/installer completion.
+- Added cancellation, inspected current screen renders, and expanded regression tests to feature, wizard and native tray integration checks. Final packaged results are recorded with the delivered build.
+- Final validation: self-contained Windows x64 publish succeeded with zero warnings/errors. Packaged executable passed the existing suite plus **48 feature assertions and 17 wizard/tray assertions**, including actual native tray create/close-to-hide/reopen/exit lifecycle. Main/setup/install/file-review screens rendered and visually inspected. Read-only live and installed-folder D2R diagnostics both returned `v0.3.30-windows-preview`. No third-party installers were executed and no tracked installation/startup setting was changed during validation.
+
+## Version naming fix — 0.3.1
+
+- User screenshot showed MVRH installed EXE version `1.0.36.0` compared against GitHub tag `hub-1.0.36`, falsely showing Update available.
+- Numeric matching now recognizes alphabetic project prefixes, a leading v, trailing zero components and build metadata. Original version/tag strings remain visible. Preview/channel suffixes and ambiguous multi-version tags are not collapsed.
+- Added regression cases for the reported mismatch, differing versions, build metadata, prerelease separation and ambiguous tags, including status, button eligibility and notification behavior.
+
+## Portable installation UX repair — 0.3.2
+
+- User reported a simple portable EXE installation becoming a confusing existing-install form with a nonfunctional Add App action. Explicitly requested UX review; delegated review and follow-up review to a UX design agent.
+- Root cause: every normal return from UpdateRunner, including cancelled file review and declined installer launch, set installAttempted and switched to the existing-install completion form. Portable destination also expected an exact EXE while accepting a confusing folder field.
+- Split new-install setup from existing tracking and installer completion. New EXEs explicitly choose portable save versus installer launch. Portable save uses folder plus filename, displays the exact final path, and pins validation/actions at the bottom. No detection/manual-version/ZIP picker fields appear in this route.
+- Introduced typed update outcomes. Deferred operations stay retryable; portable file application directly completes the dialog and adds tracking. New EXE creation skips unnecessary overwrite review; existing targets still require review/backups.
+- Recorded applied portable releases with visible provenance when EXE metadata is absent/different; only matching metadata enables automatic reconciliation. This occurs after actual file application, never just download.
+- Added 30 portable-flow assertions covering actual mocked-download → filesystem save → dialog completion → persisted library, invalid folder retry, metadata absence, cancelled overwrite review/retry, declined installer, and intent/repository state isolation. Existing regression suite plus 56 feature and 17 wizard/tray assertions also pass. No downloaded third-party program was executed.
+- UX follow-up inspected the revised renders and code, found no blocking portable-flow issue, and suggested one conditional installer/manual-download copy adjustment, which was applied.
+
+## Existing App settings review — 2026-10-30
+
+- User reported the confusing I'll update it myself option, duplicate existing-install/destination fields, and requested one well-named directory textbox after adding an app. Explicitly asked to send this to the UX designer.
+- Delegated to the same UX design agent; review completed in `review/app-settings/REVIEW.md`. No implementation changes in this review turn.
+- Recommendation: one App folder directory field, filename-only App file for portable EXEs, computed read-only target preview, clearer method labels (including Download only), version status summary and Advanced source exceptions without another directory textbox.
+- Reviewer also identified JSON-clone status reset behind Manual version tracking beside enabled automatic reconciliation. Existing conflicting paths must be resolved explicitly per app; ordinary existing EXE paths can supply folder + filename automatically.
+
+## Single-folder settings and comprehensive UX audit — 0.3.3
+
+- User directed implementation after the existing-settings review, then requested a detailed review of every journey and explicit external benchmarking.
+- Implemented App folder + filename-only App file, computed target preview, Download only naming, advanced source exceptions, accurate tracking status, one-time checks, stale-source state, unvalidated Back drafts and explicit legacy path conflict resolution. Save settings is covered by a real modal click test.
+- Full UX audit identified three P1 findings: restore/version provenance mismatch, conflicting advanced-manifest EXE targets and silent numeric downgrades. All were fixed with regression coverage.
+- Addressed additional findings: actionable missing-download states, disabled-action explanation, busy controls, chunk-cancellable ZIP staging, partial payload warnings, installed-folder access, global-preference draft/rollback, monitor/DPI bounds and core keyboard/accessibility labels.
+- External comparison used official Obtainium, UniGetUI, PortableApps, Scoop and Microsoft WinGet documentation plus published official screenshot pixels. No competitor was installed/operated. Report distinguishes documented behavior, observed illustrations and our design inferences. One-folder design is our chosen simplification, not a claimed universal industry pattern.
+- Detailed findings, sources and remaining follow-ups: `review/comprehensive-ux/REPORT.md`. Remaining work includes cancellable checking / stopping installer waits, corrupt-data recovery, tracking-only vs package downloading, live accessibility/scaling checks, typed operation phases, notification/storage refinements and friendlier remembered ZIP layout mapping. No new user decision is needed for this release.
+- Final self-contained Windows x64 publish: zero warnings/errors. Packaged executable passed the original regression suite plus **66 feature, 17 wizard/tray, 30 portable installation and 29 App settings assertions**. Actual single-folder settings and main renders inspected. Delivered detailed source-linked review and 0.3.3 ZIP; runtime OS notification/installer/accessibility limitations remain explicit.
+
+## Codeberg then GitLab — 0.4.0
+
+- User requested implementation of the first two source additions only: Codeberg, followed by GitLab. Scope is public Codeberg.org and GitLab.com; no generic direct-download/HTML or private/self-hosted source features added.
+- Implemented and tested Codeberg first, including API routing, stable/preview selection, draft exclusion, public asset transfer and source-aware persistence. A live read of codeberg.org/forgejo/forgejo returned v17.0.1.
+- Added GitLab project routing with URL-encoded nested group paths, public release lists, future/upcoming exclusion, documented preview-tag heuristics, release link parsing, friendly-label filenames, direct asset URLs and unknown-size transfer. A live read of gitlab.com/inkscape/inkscape returned INKSCAPE_1_4 (its API release provides a source tarball, correctly not offered as a Windows app).
+- Replaced GitHub-only transport with a shared release client, retaining old GitHub library keys. Provider-specific API backoff persists without blocking other hosts. Project/release links and UI labels use the detected source; portable saved-release provenance names its provider.
+- Added HTTPS redirect checks and HTML/login response rejection for structured release asset downloads. Hash and size checks remain conditional on available source/HTTP metadata.
+- Caught an overbroad source-text replacement before build and restored affected files from the last tested source snapshot, then reapplied exact edits. Regression checks validate the restored source plus new adapters.
+- Added source adapter and wizard integration tests for routing, previews, subgroup encoding, source identity, size handling, public links, redirects, login pages, duplicates and rate-limit isolation. Final packaged results recorded at delivery.
+- Final packaged build: zero warnings/errors; original suite plus 66 feature, 17 wizard/tray, 30 portable-installation, 29 App settings, 31 source and 11 source-wizard assertions passed. Packaged live metadata checks succeeded for GitHub, Codeberg and GitLab; updated first setup screen rendered and inspected. Source review: `review/sources/REVIEW.md`. Distribution uses one final `ReleaseDock-0.4.0` folder.
+
+## Automatic installer completion — 0.4.1
+
+- User asked to automate locating an app after installer execution, then clarified that a clear match must automatically add the app and close setup, not merely prefill the final form.
+- Added read-only before/after current-user/machine installed-app registration snapshots across both registry views, conservative name/asset matching, changed-entry preference, duplicate collapse and existing-directory validation. Icon and uninstall metadata are parsed only; uninstall commands are never executed.
+- A clear installed match with a usable app file/version source closes setup directly. Older numeric versions and incomplete registrations cannot falsely auto-complete. Ambiguous candidates get explicit choices; missing/delayed entries get Find installation and manual fallback.
+- File version/manifest reading is preferred. Registry DisplayVersion is an explicitly labeled one-time fallback when file metadata is unavailable. Known update destinations are not silently redirected. Full registry snapshots remain transient and are discarded after library addition.
+- Added install-discovery unit and real modal interaction tests with a simulated installer that registers a fake app. No third-party installer or Windows registry mutation is used by tests. The modal test verifies installer completion → detected folder/version → automatic dialog close → persisted library entry, without the final directory screen.
+
+## 2026-10-31 — Windows download filtering, 0.4.2
+
+- Fixed ZIP extension matching exposing Linux and macOS downloads in Windows installation and app settings. Default filtering now checks platform and architecture filename tokens, preserves unlabelled candidates, and ranks native architecture first.
+- Added a per-app Show all downloads override, used consistently by future release matching. Existing incompatible selections require explicit override.
+- Validation: self-contained Release build succeeded; packaged full regression suite passed, including 19 compatibility assertions for Airshipper, architecture, generic names, and future update selection.
+
+
+## 2026-10-31 — App names and uninstall, 0.4.3
+
+- User approved program names as primary labels with repository beneath, matching detail heading and editable App name in settings. Suggested from EXE product metadata/description, filename, then repository name. Custom names persist.
+- User specified portable ZIP uninstall removes the app folder; portable EXE removes only the file. Implemented confirmed Recycle Bin removal, protected/common shared folder checks, and distinct Stop tracking. Registered installs use a unique exact-folder Windows uninstall registration, MSI /I converted to /X, with Installed apps fallback. Tracking remains until explicitly removed.
+- Validation: packaged full regression suite passed, including 14 naming/uninstall checks and 31 settings checks. Main window rendered and visually inspected. Tests did not execute real uninstallers or remove real installed apps; recycle/uninstaller interaction requires manual testing.
+
+
+## 2026-10-31 — GROUT rename, 0.4.4
+
+- User selected GROUT (Git Release Observer & Update Tool) as the working name. Renamed visible branding, executable, product metadata, tray, settings, prompts and CLI help. Kept internal namespace, legacy data directory, startup registry value and single-instance mutex compatible with ReleaseDock.
+- Packaged regression suite passed. Existing data is read in place; no library migration or user-data mutation was performed during testing.
+
+
+## 2026-10-31 — Dotted title, 0.4.5
+- User requested G.R.O.U.T. for the in-app title. Updated window title, header and assembly title; executable remains GROUT.exe. Publish succeeded.
+

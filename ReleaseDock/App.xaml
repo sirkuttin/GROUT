@@ -1,0 +1,12 @@
+<Application x:Class="ReleaseDock.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Padding" Value="16,9"/><Setter Property="Margin" Value="0,0,8,0"/>
+      <Setter Property="Background" Value="#21334A"/><Setter Property="Foreground" Value="#F1F5FC"/>
+      <Setter Property="BorderThickness" Value="0"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" BorderThickness="1" BorderBrush="Transparent" CornerRadius="5" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.8"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#76DCC6"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="TextBox"><Setter Property="Padding" Value="10,8"/><Setter Property="Background" Value="#142033"/><Setter Property="Foreground" Value="#F1F5FC"/><Setter Property="BorderBrush" Value="#3C506A"/></Style>
+    <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#F1F5FC"/></Style>
+  </Application.Resources>
+</Application>
