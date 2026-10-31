@@ -13,7 +13,7 @@ public sealed class UpdateFile
     public bool Apply { get; set; } = true;
     public bool Existed { get; set; }
     public bool SettingsOrData { get; set; }
-    public string Action => Existed ? "Replace (backup kept)" : "Add";
+    public string Action => Existed ? "Replace" : "Add";
 }
 public sealed class Recovery
 {

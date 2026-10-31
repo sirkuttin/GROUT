@@ -81,7 +81,7 @@ public partial class MainWindow : Window
     }
     internal void StopWindow() { exiting = true; Close(); }
     internal bool TrayVisible => tray?.Visible == true;
-    private void Persist() { if (preview) return; store.Save(apps); preferences.SourceBackoffs = github.Backoffs; preferences.Save(preferencesPath); Library.Items.Refresh(); }
+    private void Persist() { if (preview) return; if (!busy && OwnedWindows.Count == 0) StorageCleanup.Sweep(apps); store.Save(apps); preferences.SourceBackoffs = github.Backoffs; preferences.Save(preferencesPath); Library.Items.Refresh(); }
     private void SafePersist() { try { Persist(); } catch (Exception ex) { StatusLabel.Text = "Could not save: " + ex.Message; } }
     private void RenderSchedule()
     {

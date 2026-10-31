@@ -142,3 +142,8 @@
 ## 2026-10-31 — Dotted title, 0.4.5
 - User requested G.R.O.U.T. for the in-app title. Updated window title, header and assembly title; executable remains GROUT.exe. Publish succeeded.
 
+
+## 2026-10-31 — Temporary update storage, 0.4.6
+- User explicitly declined retaining the latest recovery backup. Completed updates now discard rollback backups as well as downloads and ZIP staging. Temporary copies protect in-progress rollback only; interrupted recovery is preserved. Pending/manual installation payloads remain available. Startup/idle persistence sweeps obsolete legacy data; locked files retry on later sweeps.
+- Packaged regression suite passed, including 7 cleanup assertions covering completed/pending downloads, staging, completed/interrupted recovery and path containment.
+

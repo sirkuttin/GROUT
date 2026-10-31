@@ -20,6 +20,26 @@ public static class UpdateRunner
 {
     public static async Task<UpdateOutcome> Run(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel = default, bool newInstall = false, UpdatePrompts? prompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null)
     {
+        var allocate = newWork ?? AppPaths.NewWork;
+        var allocated = new List<(string Category, string Folder)>();
+        UpdateOutcome? outcome = null;
+        try
+        {
+            outcome = await RunCore(owner, app, asset, github, status, persist, cancel, newInstall, prompts, category => { var folder = allocate(category); allocated.Add((category, folder)); return folder; }, discovery);
+            return outcome.Value;
+        }
+        finally
+        {
+            foreach (var item in allocated)
+                if (item.Category == "staging" || item.Category == "backups" && StorageCleanup.SafeBackup(item.Folder) || item.Category == "downloads" && (outcome == UpdateOutcome.FilesApplied || outcome == UpdateOutcome.InstallerReturned && app.IsCurrent))
+                    StorageCleanup.DeleteFolder(item.Folder, Path.GetDirectoryName(item.Folder)!);
+            if (!File.Exists(app.DownloadedPath)) { app.DownloadedPath = ""; app.DownloadedTag = ""; }
+            if (!Directory.Exists(app.LastBackup)) app.LastBackup = "";
+            persist();
+        }
+    }
+    private static async Task<UpdateOutcome> RunCore(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel, bool newInstall, UpdatePrompts? prompts, Func<string, string>? newWork, InstallDiscovery? discovery)
+    {
         prompts ??= new(); newWork ??= AppPaths.NewWork;
         ReleaseFiles.Validate(app, asset);
         var reusable = asset.Digest?.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) == true && app.DownloadedTag == app.Latest && Path.GetFileName(app.DownloadedPath) == asset.Name && File.Exists(app.DownloadedPath) && new FileInfo(app.DownloadedPath).Length == asset.Size;

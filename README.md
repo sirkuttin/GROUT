@@ -1,6 +1,6 @@
 # G.R.O.U.T.
 
-**Git Release Observer & Update Tool** · Version 0.4.5
+**Git Release Observer & Update Tool** · Version 0.4.6
 
 A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 build bundles .NET; extract the entire ZIP and run `GROUT.exe`, keeping its supplied DLLs alongside it. Close older versions before launching this one. Your existing library is retained.
 
@@ -13,7 +13,7 @@ A native Windows app for keeping track of public app releases on **GitHub, Codeb
 
 **Add App** on an existing installation only adds tracking. New installations use an action-specific button: **Save and add app** for portable EXEs, **Download and run installer** for installers, or **Extract and add app** for ZIPs. Installer/manual-download completion stays on a separate state of screen two. Cancelling setup never adds to the library; downloads or installations already performed remain on disk, with an explanation before leaving.
 
-For a new portable EXE, explicitly choose **Save as a portable app**, select **Save in folder**, and confirm the filename and full destination. **Save and add app** saves the EXE without running it and adds it directly to the library. This page contains no existing-install location, manual version or reconciliation fields. It creates the destination folder if needed. Existing files require overwrite review and a backup. Cancelling review or declining an installer keeps the original setup and retry action; neither counts as a successful installation.
+For a new portable EXE, explicitly choose **Save as a portable app**, select **Save in folder**, and confirm the filename and full destination. **Save and add app** saves the EXE without running it and adds it directly to the library. This page contains no existing-install location, manual version or reconciliation fields. It creates the destination folder if needed. Existing files require overwrite review and temporary rollback protection. Cancelling review or declining an installer keeps the original setup and retry action; neither counts as a successful installation.
 
 After an exact portable EXE has actually been saved, GROUT records the source release it saved. If the EXE provides matching version metadata, automatic reconciliation is enabled. If metadata is missing or differs, the applied release is retained with a visible provenance explanation and automatic metadata comparison is paused. A successful file save is not treated as failed merely because the EXE omits version metadata. Future GROUT replacements update this recorded release.
 
@@ -28,7 +28,7 @@ Duplicate repositories open the existing library item. Tracking an existing app 
 | Run an installer | Download the selected EXE/MSI, then explicitly offer to run it. The installer controls its own destination. Installer exit never proves the installation succeeded. |
 | Extract into this folder | Stage the ZIP, inspect its paths, choose whether to remove a single outer folder, and review individual additions/replacements. Existing settings/save files are unchecked by default using conservative filename rules. Review all file selections before applying. |
 
-ZIP updates preserve files absent from the archive. Replaced files are backed up. A failed application attempts to restore already-changed files; error messages identify the backup if recovery needs attention. Unsafe archive paths, Windows device names, duplicate/colliding paths, archive links and linked destination paths are rejected. ZIPs are limited to 10,000 entries and 8 GB uncompressed data. No forced app shutdown or silent privilege elevation is performed by file replacement; unwritable/locked destinations need attention before retrying.
+ZIP updates preserve files absent from the archive. Replaced files use temporary rollback copies during the operation. A failed application attempts to restore already-changed files; error messages identify the backup if recovery needs attention. Unsafe archive paths, Windows device names, duplicate/colliding paths, archive links and linked destination paths are rejected. ZIPs are limited to 10,000 entries and 8 GB uncompressed data. No forced app shutdown or silent privilege elevation is performed by file replacement; unwritable/locked destinations need attention before retrying.
 
 **Restore previous files** reverts the last file-based update. It restores replaced files and removes files that update added; later changes to those files will be overwritten, as the confirmation explains. Empty directories may remain. Backups are retained in GROUT's data folder. Installer rollback is controlled by that installer, not GROUT.
 
@@ -68,7 +68,7 @@ Closing the window keeps GROUT in the Windows tray. Double-click the icon to reo
 
 Local versions are checked during release checks, every minute while running (including in the tray), and when returning to the window. Folder detection checks `release-manifest.json`, then `vrmod-manifest.json`, then a single top-level EXE excluding installer/updater/crash-handler names. You can choose a specific EXE or JSON file with a top-level `release_tag` or `version` string. No recursive scan is performed. Continuous version detection reads files; post-installer discovery can use a Windows registered version as a clearly labeled one-time fallback.
 
-## Automatic installer completion in 0.4.5
+## Automatic installer completion in 0.4.6
 
 Before starting an installer, GROUT takes a read-only snapshot of Windows installed-app entries in the current-user and machine uninstall registries, including 32-bit and 64-bit views. After the installer returns, it looks for matching entries, favoring exact project/asset/app names and newly added or changed registrations. It reads InstallLocation, DisplayIcon and, as a directory-only fallback, UninstallString. It never executes uninstall commands.
 
@@ -96,7 +96,7 @@ The method formerly called I'll update it myself is now **Download only**. Versi
 
 Ordinary Update blocks recognizable numeric downgrades. Partial ZIP application of non-settings payload keeps a warning even if a new manifest reports the latest version. File-restore backups retain prior version/provenance/mode; older backups without those records fall back to unknown rather than retaining an incorrect latest version. ZIP staging is cancellable between chunks. Initial windows are bounded to the monitor's working area/DPI; live accessibility and multi-scaling testing are still pending.
 
-Known follow-ups include cancellation of check batches, stopping an external-installer wait, richer corrupt-data recovery, explicit tracking-only mode and cache/backup management. Installer execution, Windows notification delivery and startup registration are not exercised by the automated suite.
+Known follow-ups include cancellation of check batches, stopping an external-installer wait, richer corrupt-data recovery, explicit tracking-only mode . Installer execution, Windows notification delivery and startup registration are not exercised by the automated suite.
 
 ## Build and diagnostics
 
@@ -104,7 +104,7 @@ Requires Windows and .NET 10 SDK:
 
 ```powershell
 dotnet build ReleaseDock/ReleaseDock.csproj -c Release --source https://api.nuget.org/v3/index.json
-dotnet publish ReleaseDock/ReleaseDock.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o outputs/GROUT-0.4.5 --source https://api.nuget.org/v3/index.json
+dotnet publish ReleaseDock/ReleaseDock.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o outputs/GROUT-0.4.6 --source https://api.nuget.org/v3/index.json
 ```
 
 ```text
@@ -131,3 +131,5 @@ App names appear above repository names in the library and details. App settings
 Uninstall launches a uniquely matched registered Windows uninstaller. Portable EXE removal recycles just the selected EXE; portable ZIP removal recycles the entire app folder after confirmation. System/common shared folders are blocked. Stop tracking remains separate. If no registered uninstaller matches, Windows Installed apps opens. Uninstaller completion is not automatically verified.
 
 GROUT means Git Release Observer & Update Tool. This rename retains the existing %LOCALAPPDATA%\ReleaseDock data folder and startup registration for compatibility. Close ReleaseDock before launching GROUT. If Windows startup was enabled, toggle it off/on in GROUT settings to point it at GROUT.exe in its new location.
+
+Storage cleanup (0.4.6): completed portable operations discard their downloaded payload, ZIP staging and temporary rollback copies. Verified installer downloads are removed. Pending/manual downloads remain available. Startup and idle saves also remove obsolete downloads, staging and completed legacy backups. Interrupted recovery journals are preserved for repair; cleanup failures such as locked files are retried later.
