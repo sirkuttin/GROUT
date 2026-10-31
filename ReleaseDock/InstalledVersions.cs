@@ -72,6 +72,22 @@ public static class InstalledVersions
 
     public static void Reconcile(TrackedApp app)
     {
+        app.InstallationMissing = false;
+        var draft = AppLocationDraft.From(app);
+        var location = draft.FileName.Length > 0 ? Path.Combine(draft.Folder, draft.FileName) : app.InstallLocation;
+        if (location.Length > 0)
+        {
+            try { _ = File.GetAttributes(location); }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                app.InstallationMissing = true; app.LocalError = true;
+                app.LocalStatus = "The saved app location no longer exists: " + location;
+                app.UpdateState = "";
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException) { }
+        }
+        if (!app.AutoReconcile) app.LocalError = false;
         if (!app.AutoReconcile) { app.LocalStatus = app.InstalledProvenance.Length > 0 ? app.InstalledProvenance : "Manual version tracking"; return; }
         try
         {

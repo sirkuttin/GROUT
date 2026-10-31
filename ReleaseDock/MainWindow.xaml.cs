@@ -100,15 +100,23 @@ public partial class MainWindow : Window
         SourceLabel.Text = app?.ProjectLabel ?? "";
         VersionLabel.Text = app?.Versions ?? "Choose Add App to track an existing installation or install something new from a supported release host.";
         StateLabel.Text = app?.DisplayStatus ?? "";
+        var missing = app?.InstallationMissing == true;
+        MissingBanner.Visibility = missing ? Visibility.Visible : Visibility.Collapsed;
+        StateLabel.Visibility = VersionSection.Visibility = MethodLabel.Visibility = missing ? Visibility.Collapsed : Visibility.Visible;
+        MissingMessage.Text = "The app may have been moved or uninstalled. Find it again or stop tracking it.\n\n" + app?.LocalStatus;
+        StateLabel.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(app?.StatusColor ?? "#76DCC6"));
+        VersionSection.IsEnabled = UninstallButton.IsEnabled = AppSettingsButton.IsEnabled = !busy && !missing;
+        FindInstallationButton.IsEnabled = !busy;
+        RemoveButton.Visibility = missing ? Visibility.Collapsed : Visibility.Visible;
         InstalledInput.Text = app?.Installed ?? "";
         LocalLabel.Text = app?.LocalStatus ?? "";
         var asset = app != null ? ReleaseFiles.Match(app) : null;
         UpdateButton.IsEnabled = !busy && app?.CanUpdate == true && asset != null;
         UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose a release download in App settings." : "Apply the configured update method.";
         MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod) + (asset == null ? " · Choose a release file in App settings" : app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
-        UpdateStateLabel.Text = app == null ? "" : string.Join("\n", new[] { app.Error, app.UpdateState }.Where(s => s.Length > 0));
+        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.UpdateState }.Where(s => s.Length > 0));
         DownloadedButton.Visibility = app != null && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
-        AppFolderButton.Visibility = app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        AppFolderButton.Visibility = !missing && app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         RecoveryButton.Visibility = app != null && File.Exists(Path.Combine(app.LastBackup, "recovery.json")) ? Visibility.Visible : Visibility.Collapsed;
         Notes.Text = app?.Release?.Notes ?? "Check for releases to load notes.";
         CheckedLabel.Text = app?.CheckedAt is { } time ? $"Release checked {time.ToLocalTime():g}" : "Release not checked yet";
@@ -117,7 +125,7 @@ public partial class MainWindow : Window
     private void ReconcileAll()
     {
         if (busy || preview || OwnedWindows.Count > 0) return;
-        foreach (var app in apps.Where(a => a.AutoReconcile))
+        foreach (var app in apps)
         {
             InstalledVersions.Reconcile(app);
             if (!app.LocalError && app.IsCurrent && !app.PartialUpdate && app.UpdateState.Length > 0) app.UpdateState = "Installed version detected";
@@ -178,6 +186,38 @@ public partial class MainWindow : Window
         catch (Exception ex) { StatusLabel.Text = ex.Message; }
     }
     private void Selected(object sender, SelectionChangedEventArgs e) { Render(); VersionSection.IsExpanded = Current is { } app && (app.Installed.Length == 0 || app.LocalError); }
+    private async void FindInstallation_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || Current is not { } app || preview) return;
+        busy = true; Render();
+        try
+        {
+            var candidates = await Task.Run(() => new InstallDiscovery().Find(app));
+            var dialog = Ui.Window("Find installation", 700, 540); dialog.Owner = this;
+            var panel = new StackPanel { Margin = new Thickness(24) };
+            panel.Children.Add(Ui.Text("Find " + app.AppName, 24));
+            panel.Children.Add(Ui.Text("Choose a Windows installation below, or browse to the app's current folder or EXE.", muted: true));
+            void Choose(string folder, string filename)
+            {
+                if (app.UpdateMethod == "ReplaceExe" && filename.Length == 0) { MessageBox.Show(dialog, "Choose the app's EXE so GROUT knows which file to replace.", "Choose app EXE"); return; }
+                app.AppFolder = folder; app.AppFile = filename; app.VersionSourceOverride = "";
+                app.InstallLocation = filename.Length > 0 ? Path.Combine(folder, filename) : folder;
+                if (app.UpdateMethod == "ReplaceExe") app.UpdateTarget = app.InstallLocation;
+                else if (app.UpdateMethod == "Zip") app.UpdateTarget = folder;
+                InstalledVersions.Reconcile(app); dialog.DialogResult = true;
+            }
+            foreach (var candidate in candidates)
+                panel.Children.Add(Ui.Button(candidate.Label, (_, _) => Choose(candidate.Folder, candidate.AppFile)));
+            if (candidates.Count == 0) panel.Children.Add(Ui.Text("No matching Windows installation found.", muted: true));
+            panel.Children.Add(Ui.Button("Choose app EXE…", (_, _) => { var picker = new Microsoft.Win32.OpenFileDialog { Title = "Find the installed app", Filter = "Application|*.exe" }; if (picker.ShowDialog(dialog) == true) Choose(Path.GetDirectoryName(picker.FileName)!, Path.GetFileName(picker.FileName)); }));
+            panel.Children.Add(Ui.Button("Choose app folder…", (_, _) => { var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Find the installed app folder" }; if (picker.ShowDialog(dialog) == true) Choose(picker.FolderName, ""); }));
+            panel.Children.Add(Ui.Button("Cancel", (_, _) => dialog.DialogResult = false));
+            dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            if (dialog.ShowDialog() == true) { SafePersist(); StatusLabel.Text = app.InstallationMissing ? app.LocalStatus : "App location updated. " + app.LocalStatus; }
+        }
+        catch (Exception ex) { StatusLabel.Text = "Could not find installation: " + ex.Message; }
+        finally { busy = false; Render(); }
+    }
     private void Recheck_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app) return;

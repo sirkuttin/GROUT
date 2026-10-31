@@ -18,6 +18,7 @@ internal static class SelfTests
         AssetCompatibilityTests.Run();
         AppIdentityTests.Run();
         StorageCleanupTests.Run();
+        MissingInstallationTests.Run();
         await FeatureTests.Run();
         await WizardTests.Run();
         await PortableInstallTests.Run();

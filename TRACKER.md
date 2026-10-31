@@ -153,3 +153,9 @@
 - User raised download size: app-only framework-dependent comparison is 508565 bytes; runtime bundling accounts for the size difference. Installer/runtime prerequisite approach recommended for a future primary distribution; not implemented yet.
 - Full packaged regression suite passed from an isolated folder containing only the EXE.
 
+
+## 2026-10-31 — Missing installations, 0.4.8
+- User observed external Gram uninstall was only exposed after manual recheck. Added presence detection during activation and each one-minute background tick for all located apps, including manually tracked versions.
+- Prominent amber App not found state with Find installation / Stop tracking, historical version label, stale-success removal and disabled update/uninstall/version editing. Finder offers Windows installation matches and EXE/folder selection. Missing and unreadable metadata remain distinct; recovered locations clear the warning.
+- Full single-EXE regression suite passed, including 10 new presence and UI assertions. Missing state rendered and visually inspected. Original private release remains unchanged.
+

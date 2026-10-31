@@ -1,6 +1,6 @@
 # G.R.O.U.T.
 
-**Git Release Observer & Update Tool** · Version 0.4.7
+**Git Release Observer & Update Tool** · Version 0.4.8
 
 A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 portable build is a single `GROUT.exe` with .NET included. Download it and run it; no adjacent DLLs or separate .NET installation are required. Native runtime components are automatically extracted into the .NET runtime cache at launch. Close older versions before launching this one. Your existing library is retained.
 
@@ -104,7 +104,7 @@ Requires Windows and .NET 10 SDK:
 
 ```powershell
 dotnet build ReleaseDock/ReleaseDock.csproj -c Release --source https://api.nuget.org/v3/index.json
-dotnet publish ReleaseDock/ReleaseDock.csproj -c Release -p:PublishProfile=Portable-win-x64 -o outputs/GROUT-0.4.7 --source https://api.nuget.org/v3/index.json
+dotnet publish ReleaseDock/ReleaseDock.csproj -c Release -p:PublishProfile=Portable-win-x64 -o outputs/GROUT-0.4.8 --source https://api.nuget.org/v3/index.json
 ```
 
 ```text
@@ -133,3 +133,6 @@ Uninstall launches a uniquely matched registered Windows uninstaller. Portable E
 GROUT means Git Release Observer & Update Tool. This rename retains the existing %LOCALAPPDATA%\ReleaseDock data folder and startup registration for compatibility. Close ReleaseDock before launching GROUT. If Windows startup was enabled, toggle it off/on in GROUT settings to point it at GROUT.exe in its new location.
 
 Storage cleanup (0.4.6): completed portable operations discard their downloaded payload, ZIP staging and temporary rollback copies. Verified installer downloads are removed. Pending/manual downloads remain available. Startup and idle saves also remove obsolete downloads, staging and completed legacy backups. Interrupted recovery journals are preserved for repair; cleanup failures such as locked files are retried later.
+
+Missing installations: GROUT checks saved app locations on activation and every minute while running, even with manual version tracking. Missing locations show an amber App not found banner and sidebar status, with Find installation and Stop tracking actions. The last recorded version is preserved as historical information; update, uninstall and version editing are disabled. Find installation offers matching Windows registrations or an EXE/folder picker. Restoring a valid location clears the missing state; unreadable version metadata remains a separate unverified state.
+GROUT.exe --preview-missing PNG_PATH renders the missing-installation screen using sample data.
