@@ -159,3 +159,7 @@
 - Prominent amber App not found state with Find installation / Stop tracking, historical version label, stale-success removal and disabled update/uninstall/version editing. Finder offers Windows installation matches and EXE/folder selection. Missing and unreadable metadata remain distinct; recovered locations clear the warning.
 - Full single-EXE regression suite passed, including 10 new presence and UI assertions. Missing state rendered and visually inspected. Original private release remains unchanged.
 
+
+## 2026-10-31 — Repeatable C# releases
+- User requested publishing 0.4.8 and a release script, explicitly selecting .csx. Added scripts/release.csx, pinned local dotnet-script tool manifest and versioned release notes. Script supports help and strict flags, isolated single-EXE build/testing, checksums, clean-main/remote/version validation, push, draft upload, digest/size verification and publication without changing repository visibility. Help and unknown-flag failure validated; 0.4.8 is being published through this script.
+

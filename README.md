@@ -136,3 +136,18 @@ Storage cleanup (0.4.6): completed portable operations discard their downloaded 
 
 Missing installations: GROUT checks saved app locations on activation and every minute while running, even with manual version tracking. Missing locations show an amber App not found banner and sidebar status, with Find installation and Stop tracking actions. The last recorded version is preserved as historical information; update, uninstall and version editing are disabled. Find installation offers matching Windows registrations or an EXE/folder picker. Restoring a valid location clears the missing state; unreadable version metadata remains a separate unverified state.
 GROUT.exe --preview-missing PNG_PATH renders the missing-installation screen using sample data.
+
+## Build and publish a release
+
+The release script is C# (`scripts/release.csx`), run through the repository-pinned `dotnet-script` local tool. Run from the checkout with .NET 10 SDK, Git, and an authenticated GitHub CLI:
+
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-script -- scripts/release.csx -- --help
+# Build, test and checksum locally without pushing or publishing:
+dotnet tool run dotnet-script -- scripts/release.csx -- --version 0.4.8
+# After updating the project version, writing release notes and committing all changes:
+dotnet tool run dotnet-script -- scripts/release.csx -- --version 0.4.8 --notes releases/v0.4.8.md --publish
+```
+
+The script validates the project version, requires a clean main branch and matching origin before publication, builds into a new isolated directory, enforces exactly one EXE, and runs the packaged self-tests. It writes distributable files under `outputs/releases/<version>/`, pushes main, uploads a draft release targeting the tested commit, verifies SHA-256 and size for all three assets, then publishes it as latest. Repository visibility is unchanged. Existing releases are never overwritten. If upload or verification fails, inspect the draft on GitHub before retrying; the script refuses to overwrite an existing release, including a draft. All options use flags; unknown or duplicate flags fail with usage. `--version` defaults to the project version, `--repo` to `sirkuttin/GROUT`, and `--notes` is mandatory for `--publish`.
