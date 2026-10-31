@@ -9,7 +9,41 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-const string Usage = "Usage: dotnet tool run dotnet-script -- scripts/release.csx -- [--version X.Y.Z] [--notes FILE] [--repo OWNER/REPO] [--publish]\nBuilds and tests a single-EXE Windows x64 release. Without --publish, nothing is pushed or published.\n--version must match the project version (defaults to it). --notes is required to publish.\n--repo defaults to sirkuttin/GROUT and must match origin. Publishing requires a clean main branch.\n-h, --help: show this help. Unknown/duplicate flags fail. Run from within the checkout.\nPrerequisites: .NET 10 SDK, dotnet tool restore, Git and authenticated GitHub CLI.";
+const string Usage = @"
+G.R.O.U.T. Release Tool
+Build, test, and optionally publish a Windows x64 single-EXE release.
+
+USAGE
+  dotnet script ./release.csx -- [options]
+
+OPTIONS
+  --version X.Y.Z    Defaults to the project version; must match it.
+  --notes FILE       Release notes Markdown file. Required to publish.
+  --repo OWNER/REPO  Default: sirkuttin/GROUT. Must match origin.
+  --publish          Push main and publish the verified GitHub release.
+                     Without this flag, only build and test locally.
+  -h, --help         Show this help.
+
+EXAMPLES  (from the scripts folder)
+  Show help:
+    dotnet script ./release.csx -- --help
+
+  Build and test locally:
+    dotnet script ./release.csx
+
+  Publish after committing the new version and release notes:
+    dotnet script ./release.csx -- --notes ../releases/v0.4.9.md --publish
+
+REQUIREMENTS
+  .NET 10 SDK, dotnet-script, Git, and authenticated GitHub CLI.
+  Run 'dotnet tool restore' to install the pinned local script runner.
+  Publishing requires a clean main branch. Existing releases are never
+  overwritten. Repository visibility is unchanged.
+
+OUTPUT
+  outputs/releases/<version>/ in the checkout.
+  Run from anywhere inside the checkout. Unknown or duplicate flags fail.
+";
 async Task<string> Run(string command, params string[] arguments)
 {
     var start = new ProcessStartInfo(command) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
