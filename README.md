@@ -1,8 +1,8 @@
 # G.R.O.U.T.
 
-**Git Release Observer & Update Tool** · Version 0.4.6
+**Git Release Observer & Update Tool** · Version 0.4.7
 
-A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 build bundles .NET; extract the entire ZIP and run `GROUT.exe`, keeping its supplied DLLs alongside it. Close older versions before launching this one. Your existing library is retained.
+A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 portable build is a single `GROUT.exe` with .NET included. Download it and run it; no adjacent DLLs or separate .NET installation are required. Native runtime components are automatically extracted into the .NET runtime cache at launch. Close older versions before launching this one. Your existing library is retained.
 
 ## Add an app
 
@@ -104,7 +104,7 @@ Requires Windows and .NET 10 SDK:
 
 ```powershell
 dotnet build ReleaseDock/ReleaseDock.csproj -c Release --source https://api.nuget.org/v3/index.json
-dotnet publish ReleaseDock/ReleaseDock.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o outputs/GROUT-0.4.6 --source https://api.nuget.org/v3/index.json
+dotnet publish ReleaseDock/ReleaseDock.csproj -c Release -p:PublishProfile=Portable-win-x64 -o outputs/GROUT-0.4.7 --source https://api.nuget.org/v3/index.json
 ```
 
 ```text

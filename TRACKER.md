@@ -147,3 +147,9 @@
 - User explicitly declined retaining the latest recovery backup. Completed updates now discard rollback backups as well as downloads and ZIP staging. Temporary copies protect in-progress rollback only; interrupted recovery is preserved. Pending/manual installation payloads remain available. Startup/idle persistence sweeps obsolete legacy data; locked files retry on later sweeps.
 - Packaged regression suite passed, including 7 cleanup assertions covering completed/pending downloads, staging, completed/interrupted recovery and path containment.
 
+
+## 2026-10-31 — Single EXE portable packaging, 0.4.7
+- User requested eliminating adjacent DLL requirements. Added a repeatable win-x64 publish profile bundling native libraries and embedded debug symbols with compression. Output contains just GROUT.exe (~72 MiB), compared with ~165 MB plus DLLs previously. Native runtime components extract to the .NET runtime cache at launch.
+- User raised download size: app-only framework-dependent comparison is 508565 bytes; runtime bundling accounts for the size difference. Installer/runtime prerequisite approach recommended for a future primary distribution; not implemented yet.
+- Full packaged regression suite passed from an isolated folder containing only the EXE.
+
