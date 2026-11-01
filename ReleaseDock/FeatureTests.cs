@@ -106,6 +106,7 @@ public static class FeatureTests
             persisted.Save([tracked]);
             Check(persisted.Load()[0].Release?.Assets.Count == 3 && persisted.Load()[0].LastNotifiedTag == "v3", "Cached releases and notification dedup survive restart");
             tracked.Error = "Last check failed"; persisted.Save([tracked]);
+            Check(tracked.DisplayStatus == "Update check failed" && tracked.StatusColor == "#F0D495", "Failed update checks show a warning on the app entry");
             Check(persisted.Load()[0].Error == "Last check failed" && !persisted.Load()[0].CanUpdate, "Failed-check state survives restart");
             var destination = Path.Combine(root, "installed"); Directory.CreateDirectory(destination);
             var cancelledDestination = Path.Combine(root, "cancel.exe"); File.WriteAllText(cancelledDestination, "original");

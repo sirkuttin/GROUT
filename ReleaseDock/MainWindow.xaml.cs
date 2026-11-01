@@ -14,7 +14,7 @@ public partial class MainWindow : Window
     private readonly ReleaseClient github = new();
     private readonly SelfUpdater selfUpdater = new();
     private SelfRelease? selfRelease;
-    private bool selfChecking;
+    private bool selfChecking, checkingApps;
     private readonly Store store;
     private readonly string preferencesPath;
     private Preferences preferences = new();
@@ -143,7 +143,7 @@ public partial class MainWindow : Window
         var app = Current;
         CheckSelfButton.IsEnabled = InstallSelfButton.IsEnabled = !busy && !selfChecking;
         if (SelfUpdateLabel.Text.Length == 0) SelfUpdateLabel.Text = "GROUT " + SelfUpdater.CurrentLabel;
-        CountLabel.Text = $"{apps.Count} app(s) · {apps.Count(a => a.CanUpdate && ReleaseFiles.Match(a) != null)} update(s) ready";
+        CountLabel.Text = checkingApps ? "Checking for updates…" : $"{apps.Count} app(s) · {apps.Count(a => a.CanUpdate && ReleaseFiles.Match(a) != null)} update(s) ready";
         AddAppButton.IsEnabled = AppSettingsButton.IsEnabled = SettingsButton.IsEnabled = CheckButton.IsEnabled = !busy;
         VersionSection.IsEnabled = UninstallButton.IsEnabled = RecoveryButton.IsEnabled = RemoveButton.IsEnabled = !busy;
         Details.Visibility = app == null ? Visibility.Collapsed : Visibility.Visible;
@@ -166,8 +166,9 @@ public partial class MainWindow : Window
         UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose a release download in App settings." : "Apply the configured update method.";
         MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod) + (asset == null ? " · Choose a release file in App settings" : app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
         UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.UpdateState }.Where(s => s.Length > 0));
-        DownloadedButton.Visibility = app != null && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
-        AppFolderButton.Visibility = !missing && app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DownloadedButton.Visibility = app?.UpdateMethod == "Manual" && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
+        AppFolderButton.Visibility = app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        AppFolderButton.IsEnabled = !busy && !missing && app != null && Directory.Exists(AppLocationDraft.From(app).Folder);
         RecoveryButton.Visibility = app != null && File.Exists(Path.Combine(app.LastBackup, "recovery.json")) ? Visibility.Visible : Visibility.Collapsed;
         KeepTrackingButton.Visibility = app?.UninstallPending == true ? Visibility.Visible : Visibility.Collapsed;
         Notes.Text = app?.Release?.Notes ?? "Check for releases to load notes.";
@@ -195,10 +196,10 @@ public partial class MainWindow : Window
     private async Task CheckAll(bool manual)
     {
         if (busy || preview || OwnedWindows.Count > 0) return;
-        busy = true; preferences.LastAttempt = DateTimeOffset.UtcNow;
+        busy = true; checkingApps = true; preferences.LastAttempt = DateTimeOffset.UtcNow;
         try
         {
-            StatusLabel.Text = "Checking releases…"; Render();
+            Render();
             var alerts = new List<TrackedApp>();
             foreach (var app in apps.ToList())
             {
@@ -210,10 +211,10 @@ public partial class MainWindow : Window
             if (apps.All(a => a.Error.Length == 0)) { preferences.LastSuccess = DateTimeOffset.UtcNow; preferences.RetryAfter = null; }
             Persist();
             if (alerts.Count > 0) tray?.ShowBalloonTip(8000, $"{alerts.Count} app update(s) available", string.Join("\n", alerts.Take(4).Select(a => a.Repo + " · " + a.Latest)), Forms.ToolTipIcon.Info);
-            StatusLabel.Text = $"{apps.Count(a => a.CanUpdate)} update(s) available · {apps.Count(a => a.Error.Length > 0)} check(s) failed";
+
         }
         catch (Exception ex) { StatusLabel.Text = ex.Message; SafePersist(); }
-        finally { busy = false; Render(); }
+        finally { checkingApps = false; busy = false; Render(); }
     }
     private void Add_Click(object sender, RoutedEventArgs e)
     {
@@ -221,7 +222,7 @@ public partial class MainWindow : Window
         var wizard = new SetupWindow(github, apps.Select(a => a.Repo)) { Owner = this };
         if (wizard.ShowDialog() != true) return;
         if (wizard.ExistingRepo.Length > 0) { Library.SelectedItem = apps.First(a => a.Repo.Equals(wizard.ExistingRepo, StringComparison.OrdinalIgnoreCase)); return; }
-        wizard.Result.InstallationBefore = []; apps.Add(wizard.Result); SafePersist(); Library.SelectedItem = wizard.Result; Render(); StatusLabel.Text = wizard.Result.InstallDiscoveryNote.Length > 0 ? "App added. " + wizard.Result.InstallDiscoveryNote : "App added.";
+        wizard.Result.InstallationBefore = []; apps.Add(wizard.Result); SafePersist(); Library.SelectedItem = wizard.Result; Render(); StatusLabel.Text = wizard.Result.InstallDiscoveryNote;
     }
     private async void AppSettings_Click(object sender, RoutedEventArgs e)
     {
@@ -238,7 +239,7 @@ public partial class MainWindow : Window
         try { if (SettingsWindow.Show(this, preferences)) { StatusLabel.Text = "Settings saved."; } }
         catch (Exception ex) { StatusLabel.Text = ex.Message; }
     }
-    private void Selected(object sender, SelectionChangedEventArgs e) { Render(); VersionSection.IsExpanded = Current is { } app && (app.Installed.Length == 0 || app.LocalError); }
+    private void Selected(object sender, SelectionChangedEventArgs e) { ActionErrorLabel.Text = ""; ActionErrorLabel.ToolTip = null; Render(); VersionSection.IsExpanded = Current is { } app && (app.Installed.Length == 0 || app.LocalError); }
     private async void FindInstallation_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app || preview) return;
@@ -302,12 +303,12 @@ public partial class MainWindow : Window
     private void Repository_Click(object sender, RoutedEventArgs e)
     {
         if (Current is not { } app) return;
-        try { Process.Start(new ProcessStartInfo(app.RepositoryUrl) { UseShellExecute = true }); } catch (Exception ex) { StatusLabel.Text = ex.Message; }
+        try { Process.Start(new ProcessStartInfo(app.RepositoryUrl) { UseShellExecute = true }); ActionErrorLabel.Text = ""; } catch (Exception ex) { ActionErrorLabel.Text = "Couldn't open the repository in your browser."; ActionErrorLabel.ToolTip = ex.Message; }
     }
     private void Release_Click(object sender, RoutedEventArgs e)
     {
         if (Current is not { } app) return;
-        try { Process.Start(new ProcessStartInfo(Repositories.Resolve(app.Repo).ReleasesUrl) { UseShellExecute = true }); } catch (Exception ex) { StatusLabel.Text = ex.Message; }
+        try { Process.Start(new ProcessStartInfo(Repositories.Resolve(app.Repo).ReleasesUrl) { UseShellExecute = true }); ActionErrorLabel.Text = ""; } catch (Exception ex) { ActionErrorLabel.Text = "Couldn't open the releases page in your browser."; ActionErrorLabel.ToolTip = ex.Message; }
     }
     private void Downloaded_Click(object sender, RoutedEventArgs e)
     {
@@ -317,7 +318,7 @@ public partial class MainWindow : Window
     private void AppFolder_Click(object sender, RoutedEventArgs e)
     {
         if (Current is not { } app) return;
-        try { var folder = AppLocationDraft.From(app).Folder; if (!Directory.Exists(folder)) throw new DirectoryNotFoundException("App folder was not found. Check App settings."); Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true }); }
+        try { var folder = AppLocationDraft.From(app).Folder; if (!Directory.Exists(folder)) { InstalledVersions.Reconcile(app); Render(); return; } Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true }); }
         catch (Exception ex) { StatusLabel.Text = ex.Message; }
     }
     private async void Recovery_Click(object sender, RoutedEventArgs e)

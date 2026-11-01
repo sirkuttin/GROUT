@@ -94,6 +94,16 @@ public static class WizardTests
             Check(main.IsVisible, "Hidden main window can reopen");
             Check(Children<Button>(main).Single(b => Equals(b.Content, "Update")).IsEnabled, "Cached checked release enables Update after restart");
             Check(!Children<TextBlock>(main).Any(t => t.Text.Contains("Last successful check:")), "Footer omits polling timestamps");
+            var status = (TextBlock)main.FindName("StatusLabel");
+            var settings = (Button)main.FindName("SettingsButton");
+            status.Text = ""; main.UpdateLayout();
+            var footerY = settings.TranslatePoint(new System.Windows.Point(), main).Y;
+            foreach (var message in new[] { "App added.", new string('W', 500) })
+            {
+                status.Text = message; main.UpdateLayout();
+                Check(System.Math.Abs(settings.TranslatePoint(new System.Windows.Point(), main).Y - footerY) < 0.1, "Status messages do not move footer controls");
+                Check(status.TranslatePoint(new System.Windows.Point(status.ActualWidth, 0), main).X <= settings.TranslatePoint(new System.Windows.Point(), main).X, "Status stays left of footer controls");
+            }
             main.StopWindow();
             Check(!main.TrayVisible, "Explicit stop removes tray icon");
         }

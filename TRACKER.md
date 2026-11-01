@@ -237,3 +237,10 @@
 - Approved compact main-window footer and margins; removed polling timestamp line without changing scheduling.
 - Refreshed documentation/screenshots and preview sample data. Full packaged regression suite and documentation links verified.
 
+
+## Footer message ownership — user direction, 2026-11-01
+- Footer is a fallback for useful messages without a better UI home. Update-check feedback belongs by its controls; app-specific feedback belongs with its app. Revised review/DECISIONS.md around routing before wording; implementation choices remain open.
+
+## 0.5.6 release
+- Header owns check progress/counts; app entries own failed-check warnings. Same-row footer, no generic added confirmation, inline link failures, missing-folder disablement and download-only file access.
+- Packaged tests cover sidebar warning state and stable footer layout. Broader footer routing remains planned, not implemented.
