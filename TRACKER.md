@@ -192,3 +192,8 @@
 
 - Publication initially encountered the user's running local0.5.0 EXE locking the artifact path. Updated the release script to select a separate commit-named build subfolder when the existing output is locked, preserving the running app.
 
+
+## 2026-10-31 — README and documentation refresh
+- User explicitly requested a documentation agent to improve the long README. Agent rewrote the front page from3251 to407 words and moved details into docs/user-guide.md, supported-sources.md, troubleshooting.md, development.md and releasing.md.
+- Added three current0.5.0 UI screenshots using sample data, about115KB total. Corrected stale backup, AppData, UI-label and manual-versus-automatic version-reading instructions. Reviewed screenshots and all guides;34 local file/image/anchor links passed validation and git diff --check passed. Documentation-only change; no new app release needed.
+
