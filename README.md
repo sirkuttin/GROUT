@@ -4,6 +4,12 @@
 
 A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 portable build is a single `GROUT.exe` with .NET included. Download it and run it; no adjacent DLLs or separate .NET installation are required. Native runtime components are automatically extracted into the .NET runtime cache at launch. Close older versions before launching this one. Your existing library is retained.
 
+## Download
+
+Get the Windows x64 portable EXE from [the latest GitHub release](https://github.com/sirkuttin/GROUT/releases/latest). Download it to a permanent folder and run it. Release assets include SHA-256 checksums and the packaged test report.
+
+**Early release:** the EXE is currently unsigned. GROUT changes installed app files only after confirmation; close the app being updated first. New features on `main` may not yet be in the latest release. Report reproducible problems through [GitHub Issues](https://github.com/sirkuttin/GROUT/issues), with the GROUT version and steps, and remove tokens and personal paths from attachments.
+
 ## Add an app
 
 **Add App** opens two screens:
