@@ -2,7 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
-using System.Text.Json;
+using ReleaseDock.Json;
 
 namespace ReleaseDock;
 
@@ -23,9 +23,9 @@ public static class FeatureTests
     private sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
     {
         public long BytesRead;
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            var count = await base.ReadAsync(buffer, cancellationToken); BytesRead += count; return count;
+            var read = await base.ReadAsync(buffer, offset, count, cancellationToken); BytesRead += read; return read;
         }
     }
     private sealed class CancellingStream(Action cancel) : Stream
@@ -36,9 +36,9 @@ public static class FeatureTests
         public override long Length => 3;
         public override long Position { get => 0; set => throw new NotSupportedException(); }
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            buffer.Span[0] = 1; buffer.Span[1] = 2; buffer.Span[2] = 3; cancel(); return ValueTask.FromResult(3);
+            buffer[offset] = 1; buffer[offset + 1] = 2; buffer[offset + 2] = 3; cancel(); return Task.FromResult(3);
         }
         public override void Flush() { }
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
@@ -224,7 +224,7 @@ public static class FeatureTests
             File.WriteAllBytes(peFixture, PortableExeFixture.Bytes());
             UpdateRunner.ValidatePortableExe(peFixture);
             Check(true, "Valid native PE without version metadata is accepted");
-            foreach (var invalidExe in new[] { Array.Empty<byte>(), "not an executable"u8.ToArray(), PortableExeFixture.Bytes()[..600] })
+            foreach (var invalidExe in new[] { Array.Empty<byte>(), System.Text.Encoding.UTF8.GetBytes("not an executable"), PortableExeFixture.Bytes().Take(600).ToArray() })
             {
                 File.WriteAllBytes(peFixture, invalidExe);
                 Fails(() => UpdateRunner.ValidatePortableExe(peFixture), "Empty, non-PE and truncated PE must be rejected");
@@ -263,7 +263,7 @@ public static class FeatureTests
         finally { Directory.Delete(root, true); }
         var rateHandler = new Handler(() =>
         {
-            var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+            var response = new HttpResponseMessage((HttpStatusCode)429);
             response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMinutes(10));
             return response;
         });

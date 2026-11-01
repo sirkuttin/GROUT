@@ -49,7 +49,7 @@ dotnet tool run dotnet-script -- scripts/release.csx -- `
 
 This example assumes the project has already been changed to 0.6.0. Optional `--version` must match the project; it does not edit it.
 
-The script builds in a new directory, enforces single-EXE output and runs packaged tests. It pushes `main`, creates a draft release targeting the tested commit, uploads all five assets and verifies their SHA-256 digests and sizes. Only then does it publish as latest. Repository visibility is unchanged.
+The script builds in a new directory, enforces single-EXE output below 1,000,000 bytes and runs packaged tests without adjacent DLLs or a config file. It pushes `main`, creates a draft release targeting the tested commit, uploads all five assets and verifies their SHA-256 digests and sizes. Only then does it publish as latest. Repository visibility is unchanged.
 
 Existing releases are never overwritten, including drafts. If uploading or verification fails, inspect the draft on GitHub before retrying. Resolve or remove that incomplete draft deliberately; rerunning does not replace it automatically.
 

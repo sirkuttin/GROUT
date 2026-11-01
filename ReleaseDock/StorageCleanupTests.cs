@@ -14,7 +14,7 @@ internal static class StorageCleanupTests
             var stale = Make("downloads", "old"); var pending = Make("downloads", "pending"); var current = Make("downloads", "current"); var staged = Make("staging", "zip");
             var safe = Make("backups", "done", "{\"State\":\"Applied\"}"); var interrupted = Make("backups", "interrupted", "{\"State\":\"Applying\"}");
             var app = new TrackedApp { Installed = "v1", Latest = "v2", DownloadedPath = pending };
-            var done = new TrackedApp { Installed = "v2", Latest = "v2", DownloadedPath = current, LastBackup = Path.GetDirectoryName(safe)! };
+            var done = new TrackedApp { Installed = "v2", Latest = "v2", DownloadedPath = current, LastBackup = Framework.GetDirectoryName(safe)! };
             StorageCleanup.Sweep([app, done], root);
             Check(!File.Exists(stale) && !File.Exists(current), "Obsolete/completed downloads removed");
             Check(File.Exists(pending), "Pending installation payload retained");
@@ -29,7 +29,7 @@ internal static class StorageCleanupTests
             var protectedApps = new[]
             {
                 new TrackedApp { Installed = "v1", Latest = "v1", InstallLocation = installed, DownloadedPath = installed },
-                new TrackedApp { Installed = "v1", Latest = "v1", AppFolder = Path.GetDirectoryName(versionSource)!, VersionSourceOverride = Path.GetFileName(versionSource) },
+                new TrackedApp { Installed = "v1", Latest = "v1", AppFolder = Framework.GetDirectoryName(versionSource)!, VersionSourceOverride = Path.GetFileName(versionSource) },
                 new TrackedApp { Installed = "v1", Latest = "v1", UpdateTarget = updateTarget }
             };
             StorageCleanup.Sweep(protectedApps, root);
@@ -44,7 +44,7 @@ internal static class StorageCleanupTests
             var previousDirectory = Directory.GetCurrentDirectory();
             try
             {
-                Directory.SetCurrentDirectory(Path.GetDirectoryName(relativeSource)!);
+                Directory.SetCurrentDirectory(Framework.GetDirectoryName(relativeSource)!);
                 StorageCleanup.Sweep([new TrackedApp { InstallLocation = "app.exe", Installed = "v1", Latest = "v1" }], root);
                 Check(File.Exists(relativeSource), "Legacy relative install path is resolved before cleanup protection");
             }

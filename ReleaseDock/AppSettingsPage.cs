@@ -38,7 +38,7 @@ public sealed class AppSettingsPage
         Panel.Children.Add(Ui.Button("Use detected name", (_, _) => { customName = false; Refresh(); }));
         Panel.Children.Add(Ui.Text("App folder", 18));
         folder = Ui.Input(draft.Folder); Name(folder, "App folder"); Panel.Children.Add(folder);
-        Panel.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new OpenFolderDialog { Title = "Choose the app folder" }; if (picker.ShowDialog(owner) == true) folder.Text = picker.FolderName; }));
+        Panel.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new FolderPicker { Title = "Choose the app folder" }; if (picker.ShowDialog(owner) == true) folder.Text = picker.FolderName; }));
         if (draft.Conflict)
         {
             var conflict = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
@@ -72,7 +72,7 @@ public sealed class AppSettingsPage
         automatic = Ui.Check("Read installed version automatically", app.AutoReconcile); advanced.Children.Add(automatic);
         manualPanel = new StackPanel(); manualPanel.Children.Add(Ui.Text("Installed version", muted: true)); manual = Ui.Input(app.Installed); Name(manual, "Manual installed version"); manualPanel.Children.Add(manual); advanced.Children.Add(manualPanel);
         sourceLabel = Ui.Text("", muted: true); advanced.Children.Add(sourceLabel);
-        advanced.Children.Add(Ui.Button("Choose version file…", (_, _) => { var picker = new OpenFileDialog { Title = "Choose a version source", Filter = "Version sources|*.exe;*.json" }; if (picker.ShowDialog(owner) == true) { draft.SourceOverride = string.Equals(Path.GetDirectoryName(picker.FileName), folder.Text, StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(picker.FileName) : picker.FileName; automatic.IsChecked = true; CheckVersion(); } }));
+        advanced.Children.Add(Ui.Button("Choose version file…", (_, _) => { var picker = new OpenFileDialog { Title = "Choose a version source", Filter = "Version sources|*.exe;*.json" }; if (picker.ShowDialog(owner) == true) { draft.SourceOverride = string.Equals(Framework.GetDirectoryName(picker.FileName), folder.Text, StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(picker.FileName) : picker.FileName; automatic.IsChecked = true; CheckVersion(); } }));
         advanced.Children.Add(Ui.Button("Use app location for version", (_, _) => { draft.SourceOverride = ""; CheckVersion(); }));
         previews = Ui.Check("Include preview releases", app.IncludePrereleases); advanced.Children.Add(previews);
         advancedSection = new Expander { Header = "Advanced settings", Foreground = System.Windows.Media.Brushes.White, Content = advanced, Margin = new Thickness(0, 14, 0, 0) }; Panel.Children.Add(advancedSection);
@@ -144,7 +144,7 @@ public sealed class AppSettingsPage
         app.Installed = manual.Text.Trim(); app.AutoReconcile = automatic.IsChecked == true; app.IncludePrereleases = previews.IsChecked == true;
         if (!draft.Conflict)
         {
-            app.InstallLocation = draft.SourceOverride.Length > 0 ? Path.IsPathFullyQualified(draft.SourceOverride) ? draft.SourceOverride : draft.Folder + Path.DirectorySeparatorChar + draft.SourceOverride : draft.FileName.Length > 0 ? draft.Folder + Path.DirectorySeparatorChar + draft.FileName : draft.Folder;
+            app.InstallLocation = draft.SourceOverride.Length > 0 ? Framework.IsPathFullyQualified(draft.SourceOverride) ? draft.SourceOverride : draft.Folder + Path.DirectorySeparatorChar + draft.SourceOverride : draft.FileName.Length > 0 ? draft.Folder + Path.DirectorySeparatorChar + draft.FileName : draft.Folder;
             app.UpdateTarget = Method == "ReplaceExe" ? draft.Folder + Path.DirectorySeparatorChar + draft.FileName : Method == "Zip" ? draft.Folder : "";
         }
         if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) app.AssetName = asset.Name;

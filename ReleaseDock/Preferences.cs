@@ -1,5 +1,5 @@
 using System.IO;
-using System.Text.Json;
+using ReleaseDock.Json;
 using Microsoft.Win32;
 
 namespace ReleaseDock;
@@ -38,9 +38,9 @@ public sealed class Preferences
     public void Save(string? path = null)
     {
         path ??= Path.Combine(AppPaths.Data, "settings.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        Directory.CreateDirectory(Framework.GetDirectoryName(path)!);
         File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(path + ".tmp", path, true);
+        Framework.Move(path + ".tmp", path, true);
     }
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     public static bool StartsWithWindows()
@@ -51,7 +51,7 @@ public sealed class Preferences
     public static void SetStartupCommand(string? command) { using var key = Registry.CurrentUser.CreateSubKey(RunKey); if (command != null) key.SetValue("ReleaseDock", command); else key.DeleteValue("ReleaseDock", false); }
     public static void SetStartup(bool enabled)
     {
-        SetStartupCommand(enabled ? $"\"{Environment.ProcessPath}\" --tray" : null);
+        SetStartupCommand(enabled ? $"\"{Framework.ProcessPath}\" --tray" : null);
     }
 }
 
@@ -83,12 +83,12 @@ public static class ReleaseFiles
         if (app.UpdateMethod == "Zip" && ext != ".zip") throw new InvalidOperationException("Extraction needs a ZIP release file.");
         if (app.UpdateMethod is "Zip" or "ReplaceExe")
         {
-            if (!Path.IsPathFullyQualified(app.UpdateTarget)) throw new InvalidOperationException("Choose an absolute update destination.");
+            if (!Framework.IsPathFullyQualified(app.UpdateTarget)) throw new InvalidOperationException("Choose an absolute update destination.");
             var target = Path.GetFullPath(app.UpdateTarget);
             if (target.TrimEnd('\\') == Path.GetPathRoot(target)?.TrimEnd('\\')) throw new InvalidOperationException("Choose an app folder, not a drive root.");
             if (target.StartsWith(AppPaths.Data + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || target.Equals(AppPaths.Data, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Choose an app destination outside GROUT's own data folder.");
             if (File.Exists(target) && app.UpdateMethod == "Zip" || Directory.Exists(target) && app.UpdateMethod == "ReplaceExe") throw new InvalidOperationException("The destination type does not match the update method.");
-            if (target.Equals(Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("GROUT cannot replace its own running executable.");
+            if (target.Equals(Framework.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("GROUT cannot replace its own running executable.");
         }
     }
 }

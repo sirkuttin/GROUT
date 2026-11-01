@@ -3,7 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text.Json;
+using ReleaseDock.Json;
 namespace ReleaseDock;
 internal static class SelfUpdateTests
 {
@@ -20,10 +20,10 @@ internal static class SelfUpdateTests
     public static async Task TestHost(string root)
     {
         ValidateTestRoot(root);
-        if (!string.Equals(Path.GetDirectoryName(Environment.ProcessPath), root, StringComparison.OrdinalIgnoreCase) || !(Path.GetFileName(Environment.ProcessPath!).Equals("GROUT.exe", StringComparison.OrdinalIgnoreCase) || SelfUpdateMigration.Destination(Environment.ProcessPath!) != Environment.ProcessPath)) throw new IOException("Not the isolated test executable.");
+        if (!string.Equals(Framework.GetDirectoryName(Framework.ProcessPath), root, StringComparison.OrdinalIgnoreCase) || !(Path.GetFileName(Framework.ProcessPath!).Equals("GROUT.exe", StringComparison.OrdinalIgnoreCase) || SelfUpdateMigration.Destination(Framework.ProcessPath!) != Framework.ProcessPath)) throw new IOException("Not the isolated test executable.");
         var folder = AppPaths.NewWork("self-update"); var package = Path.Combine(folder, "update.exe");
-        File.Copy(Environment.ProcessPath!, package);
-        string hash; using (var file = File.OpenRead(package)) hash = Convert.ToHexString(SHA256.HashData(file));
+        File.Copy(Framework.ProcessPath!, package);
+        string hash; using (var file = File.OpenRead(package)) hash = Framework.Hex(Framework.Hash(file));
         using var helper = await SelfUpdateHandoff.Start(package, hash, folder, Path.Combine(root, "restarted.txt"), File.Exists(Path.Combine(root, "simulate-startup-failure")));
         File.WriteAllText(Path.Combine(root, "helper.json"), JsonSerializer.Serialize(new { helper.Id, Folder = folder, Plan = File.ReadAllText(Path.Combine(folder, "plan.json")) }));
     }
@@ -37,7 +37,7 @@ internal static class SelfUpdateTests
         try
         {
             var notices = typeof(SelfUpdater).Assembly.GetManifestResourceNames();
-            Check(notices.Any(n => n.EndsWith("GROUT-LICENSE.txt")) && notices.Any(n => n.EndsWith("DOTNET-THIRD-PARTY-NOTICES.txt")), "Licenses embedded in portable EXE");
+            Check(notices.Any(n => n.EndsWith("GROUT-LICENSE.txt")) && notices.Any(n => n.EndsWith("WINDOWS-FRAMEWORK.txt")), "Licenses embedded in portable EXE");
             var release = SelfUpdater.Parse(Metadata(), new Version(1, 0, 0, 0))!;
             Check(release.Version == new Version(9, 0, 0), "New stable release selected");
             var stableMetadata = Metadata().Replace("\"assets\":[", "\"assets\":[{\"name\":\"GROUT.exe\",\"id\":3,\"state\":\"uploaded\"},");
@@ -46,7 +46,7 @@ internal static class SelfUpdateTests
             Check(SelfUpdater.Parse(Metadata(), new Version(9, 0, 0, 0)) == null && SelfUpdater.Parse(Metadata(), new Version(10, 0, 0, 0)) == null, "Current/older releases never offered");
             Check(SelfUpdater.Parse(Metadata(preview: true), new Version(1, 0, 0, 0)) == null, "Preview excluded");
             Fails(() => SelfUpdater.Parse(Metadata("v9-beta"), new Version(1, 0, 0, 0)), "Unrecognized tag rejected");
-            var bytes = "MZnew-version"u8.ToArray(); var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            var bytes = System.Text.Encoding.UTF8.GetBytes("MZnew-version"); var hash = Framework.Hex(Framework.Hash(bytes)).ToLowerInvariant();
             var sums = hash + "  " + release.ExeName + "\n";
             Check(SelfUpdater.Checksum(sums, release.ExeName) == hash, "Exact filename checksum read");
             Fails(() => SelfUpdater.Checksum(sums + sums, release.ExeName), "Duplicate checksum rejected");
@@ -58,7 +58,7 @@ internal static class SelfUpdateTests
             }));
             var downloaded = await updater.Download(release, Path.Combine(root, "download"), CancellationToken.None);
             Check(File.ReadAllBytes(downloaded.Path).SequenceEqual(bytes), "Verified asset download");
-            using var corrupt = new SelfUpdater(new Handler(request => new(HttpStatusCode.OK) { Content = request.RequestUri!.AbsolutePath.EndsWith("/2") ? new StringContent(sums) : new ByteArrayContent("MZcorrupt"u8.ToArray()) }));
+            using var corrupt = new SelfUpdater(new Handler(request => new(HttpStatusCode.OK) { Content = request.RequestUri!.AbsolutePath.EndsWith("/2") ? new StringContent(sums) : new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("MZcorrupt")) }));
             var rejected = false; try { await corrupt.Download(release, Path.Combine(root, "corrupt"), CancellationToken.None); } catch (IOException) { rejected = true; } Check(rejected, "Corrupt payload rejected before handoff");
             var target = Path.Combine(root, "target.exe"); File.WriteAllText(target, "old");
             SelfUpdateHandoff.Replace(downloaded.Path, target, hash, () => Check(File.ReadAllBytes(target).SequenceEqual(bytes), "New file installed before relaunch"));
@@ -100,21 +100,21 @@ internal static class SelfUpdateTests
             File.WriteAllText(stable, "other install");
             Fails(() => SelfUpdateMigration.CheckDestination(legacy, stable), "Existing stable copy not overwritten");
             Check(File.ReadAllText(stable) == "other install", "Existing copy unchanged"); File.Delete(stable);
-            var oldHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(legacy)));
+            var oldHash = Framework.Hex(Framework.Hash(File.ReadAllBytes(legacy)));
             SelfUpdateMigration.Install(downloaded.Path, legacy, stable, hash, () => { });
             var migration = new SelfUpdatePlan(0, 0, stable, downloaded.Path, hash, OriginalTarget: legacy, OriginalHash: oldHash);
             SelfUpdateMigration.RemoveOriginal(migration); Check(!File.Exists(legacy) && File.Exists(stable), "Old filename removed only after successful migration");
             File.WriteAllText(legacy, "changed"); SelfUpdateMigration.RemoveOriginal(migration); Check(File.Exists(legacy), "Changed original copy is not deleted");
             File.Delete(legacy); File.Delete(stable);
-            if (new FileInfo(Environment.ProcessPath!).Length > 50 * 1024 * 1024)
+            if (File.Exists(Framework.ProcessPath))
             {
                 foreach (var (hostName, failStartup) in new[] { ("GROUT.exe", false), ("GROUT-0.5.0-win-x64.exe", false), ("GROUT.exe", true), ("GROUT-0.5.0-win-x64.exe", true) })
                 {
                 var scenario = Path.Combine(root, (failStartup ? "fail-" : "") + hostName.Replace(".exe", "")); Directory.CreateDirectory(scenario);
                 if (failStartup) File.WriteAllText(Path.Combine(scenario, "simulate-startup-failure"), "test");
-                var host = Path.Combine(scenario, hostName); File.Copy(Environment.ProcessPath!, host);
+                var host = Path.Combine(scenario, hostName); File.Copy(Framework.ProcessPath!, host);
                 var start = new ProcessStartInfo(host) { UseShellExecute = false, CreateNoWindow = true };
-                start.ArgumentList.Add("--self-update-test-host"); start.ArgumentList.Add(scenario);
+                start.AddArgument("--self-update-test-host"); start.AddArgument(scenario);
                 using var parent = Process.Start(start)!; using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
                 await parent.WaitForExitAsync(timeout.Token); Check(parent.ExitCode == 0, "Isolated parent hands off successfully");
                 using var info = JsonDocument.Parse(File.ReadAllText(Path.Combine(scenario, "helper.json")));

@@ -51,7 +51,7 @@ public static class SourceTests
             var store = new Store(Path.Combine(root, "apps.json")); store.Save([new() { Repo = "owner/app" }, new() { Repo = "https://codeberg.org/owner/app", Release = stable }]);
             var entries = store.Load();
             Check(entries[0].Repo != entries[1].Repo && entries[1].Release!.Assets.Single().OriginHost == "codeberg.org", "Provider identity and asset provenance survive library persistence");
-            using var download = new ReleaseClient(new Handler(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent("abc"u8.ToArray()) }));
+            using var download = new ReleaseClient(new Handler(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("abc")) }));
             await download.Download(stable.Assets.Single(), Path.Combine(root, "app.exe"), new Progress<double>(), CancellationToken.None);
             Check(File.ReadAllText(Path.Combine(root, "app.exe")) == "abc", "Codeberg release asset downloads through existing pipeline");
             await download.Download(gitlabStable.Assets[0], Path.Combine(root, "gitlab.exe"), new Progress<double>(), CancellationToken.None);
@@ -59,7 +59,7 @@ public static class SourceTests
             using var html = new ReleaseClient(new Handler(_ => new(HttpStatusCode.OK) { Content = new StringContent("<html>Sign in</html>", System.Text.Encoding.UTF8, "text/html") }));
             try { await html.Download(gitlabStable.Assets[0], Path.Combine(root, "login.exe"), new Progress<double>(), CancellationToken.None); throw new Exception("Login page accepted as app"); } catch (IOException) { Assertions++; }
             Check(!File.Exists(Path.Combine(root, "login.exe")), "HTML login response is not saved as an executable");
-            var redirected = new Handler(r => r.RequestUri!.Host == "codeberg.org" ? new(HttpStatusCode.Found) { Headers = { Location = new Uri("https://cdn.example.org/App.exe") } } : new(HttpStatusCode.OK) { Content = new ByteArrayContent("abc"u8.ToArray()) });
+            var redirected = new Handler(r => r.RequestUri!.Host == "codeberg.org" ? new(HttpStatusCode.Found) { Headers = { Location = new Uri("https://cdn.example.org/App.exe") } } : new(HttpStatusCode.OK) { Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("abc")) });
             using var redirects = new ReleaseClient(redirected);
             await redirects.Download(stable.Assets[0], Path.Combine(root, "redirect.exe"), new Progress<double>(), CancellationToken.None);
             Check(redirected.Requests.Count == 2 && File.ReadAllText(Path.Combine(root, "redirect.exe")) == "abc", "HTTPS release CDN redirect followed without source change");
@@ -71,7 +71,7 @@ public static class SourceTests
         var rate = new Handler(r =>
         {
             if (r.RequestUri!.Host != "codeberg.org") return Json("{}");
-            var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests); response.Headers.RetryAfter = new(TimeSpan.FromMinutes(5)); return response;
+            var response = new HttpResponseMessage((HttpStatusCode)429); response.Headers.RetryAfter = new(TimeSpan.FromMinutes(5)); return response;
         });
         using var isolated = new ReleaseClient(rate);
         try { await isolated.VerifyRepository("https://codeberg.org/owner/app"); } catch (InvalidOperationException) { }

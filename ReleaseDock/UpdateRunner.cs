@@ -31,7 +31,7 @@ public static class UpdateRunner
         {
             foreach (var item in allocated)
                 if (item.Category == "staging" || item.Category == "backups" && StorageCleanup.SafeBackup(item.Folder) || item.Category == "downloads" && (outcome == UpdateOutcome.FilesApplied || outcome == UpdateOutcome.InstallerReturned && app.IsCurrent))
-                    StorageCleanup.DeleteFolder(item.Folder, Path.GetDirectoryName(item.Folder)!);
+                    StorageCleanup.DeleteFolder(item.Folder, Framework.GetDirectoryName(item.Folder)!);
             if (!File.Exists(app.DownloadedPath)) { app.DownloadedPath = ""; app.DownloadedTag = ""; }
             if (!Directory.Exists(app.LastBackup)) app.LastBackup = "";
             persist();
@@ -44,8 +44,8 @@ public static class UpdateRunner
         var reusable = asset.Digest?.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) == true && app.DownloadedTag == app.Latest && Path.GetFileName(app.DownloadedPath) == asset.Name && File.Exists(app.DownloadedPath) && new FileInfo(app.DownloadedPath).Length == asset.Size;
         if (reusable && asset.Digest?.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) == true)
         {
-            await using var cached = File.OpenRead(app.DownloadedPath);
-            var hash = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(cached, cancel));
+            using var cached = File.OpenRead(app.DownloadedPath);
+            var hash = Framework.Hex(await Framework.HashAsync(cached, cancel));
             reusable = hash.Equals(asset.Digest[7..], StringComparison.OrdinalIgnoreCase);
         }
         var path = reusable ? app.DownloadedPath : Path.Combine(newWork("downloads"), Path.GetFileName(asset.Name));
@@ -95,7 +95,7 @@ public static class UpdateRunner
             status("Replacing app file…", 100);
             app.LastBackup = newWork("backups"); persist();
             var previous = InstallationSnapshot.Capture(app);
-            await Task.Run(() => FileUpdates.Apply(plan, Path.GetDirectoryName(target)!, app.LastBackup, previous));
+            await Task.Run(() => FileUpdates.Apply(plan, Framework.GetDirectoryName(target)!, app.LastBackup, previous));
             InstalledVersions.RecordAppliedExe(app); persist(); status(app.UpdateState, 100);
             return UpdateOutcome.FilesApplied;
         }
@@ -124,20 +124,25 @@ public static class UpdateRunner
         try
         {
             using var stream = File.OpenRead(path);
-            using var reader = new System.Reflection.PortableExecutable.PEReader(stream);
-            var headers = reader.PEHeaders;
-            var pe = headers.PEHeader;
-            var flags = headers.CoffHeader.Characteristics;
-            if (pe == null || (flags & System.Reflection.PortableExecutable.Characteristics.ExecutableImage) == 0 ||
-                (flags & System.Reflection.PortableExecutable.Characteristics.Dll) != 0 || headers.SectionHeaders.Length == 0)
-                throw new BadImageFormatException();
+            using var reader = new BinaryReader(stream);
+            if (stream.Length < 64 || reader.ReadUInt16() != 0x5a4d) throw new BadImageFormatException();
+            stream.Position = 0x3c; var header = reader.ReadUInt32();
+            if (header > stream.Length - 24) throw new BadImageFormatException();
+            stream.Position = header;
+            if (reader.ReadUInt32() != 0x4550) throw new BadImageFormatException();
+            reader.ReadUInt16(); var sections = reader.ReadUInt16();
+            stream.Position = header + 20; var optionalSize = reader.ReadUInt16(); var flags = reader.ReadUInt16();
+            if ((flags & 2) == 0 || (flags & 0x2000) != 0 || sections == 0 || sections > 96 || optionalSize < 64 || (long)header + 24 + optionalSize + sections * 40 > stream.Length) throw new BadImageFormatException();
+            var magic = reader.ReadUInt16(); if (magic is not (0x10b or 0x20b)) throw new BadImageFormatException();
+            stream.Position = header + 24 + 16; var entry = reader.ReadUInt32();
             var entryMapped = false;
-            foreach (var section in headers.SectionHeaders)
+            for (var i = 0; i < sections; i++)
             {
-                if (section.PointerToRawData < 0 || section.SizeOfRawData < 0 || (long)section.PointerToRawData + section.SizeOfRawData > stream.Length)
-                    throw new BadImageFormatException();
-                var offset = (long)pe.AddressOfEntryPoint - section.VirtualAddress;
-                if (offset >= 0 && offset < section.SizeOfRawData) entryMapped = true;
+                stream.Position = header + 24 + optionalSize + i * 40 + 12;
+                var address = reader.ReadUInt32(); var size = reader.ReadUInt32(); var pointer = reader.ReadUInt32();
+                if ((long)pointer + size > stream.Length) throw new BadImageFormatException();
+                var offset = (long)entry - address;
+                if (offset >= 0 && offset < size) entryMapped = true;
             }
             if (!entryMapped) throw new BadImageFormatException();
         }

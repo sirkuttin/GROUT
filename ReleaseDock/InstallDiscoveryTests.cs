@@ -18,7 +18,7 @@ public static class InstallDiscoveryTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (request.RequestUri!.AbsolutePath.Contains("/releases/download/")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent("abc"u8.ToArray()) });
+            if (request.RequestUri!.AbsolutePath.Contains("/releases/download/")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("abc")) });
             var json = request.RequestUri.AbsolutePath.EndsWith("releases/latest") ? """{"tag_name":"v3.4.1","html_url":"https://codeberg.org/GramEditor/gram/releases/tag/v3.4.1","body":"","assets":[{"name":"GramSetup-3.4.1.exe","browser_download_url":"https://codeberg.org/GramEditor/gram/releases/download/v3.4.1/setup.exe","size":3}]}""" : "{}";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") });
         }

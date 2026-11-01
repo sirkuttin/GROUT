@@ -104,7 +104,7 @@ public partial class MainWindow : Window
     private async void InstallSelf_Click(object sender, RoutedEventArgs e)
     {
         if (busy || selfChecking || selfRelease is not { } release || OwnedWindows.Count > 0 || preview) return;
-        if (MessageBox.Show(this, $"Update GROUT from {SelfUpdater.CurrentLabel} to {release.Version} and restart?\n\nThe verified GitHub release will replace:\n{Environment.ProcessPath}\n\nYour library and settings will be preserved.", "Update GROUT", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(this, $"Update GROUT from {SelfUpdater.CurrentLabel} to {release.Version} and restart?\n\nThe verified GitHub release will replace:\n{Framework.ProcessPath}\n\nYour library and settings will be preserved.", "Update GROUT", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         busy = true; operation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         var folder = AppPaths.NewWork("self-update"); Process? helper = null;
         Progress.IsIndeterminate = true; Progress.Visibility = CancelDownload.Visibility = Visibility.Visible; Render();
@@ -266,8 +266,8 @@ public partial class MainWindow : Window
             foreach (var candidate in candidates)
                 panel.Children.Add(Ui.Button(candidate.Label, (_, _) => Choose(candidate.Folder, candidate.AppFile)));
             if (candidates.Count == 0) panel.Children.Add(Ui.Text("No matching Windows installation found.", muted: true));
-            panel.Children.Add(Ui.Button("Choose app EXE…", (_, _) => { var picker = new Microsoft.Win32.OpenFileDialog { Title = "Find the installed app", Filter = "Application|*.exe" }; if (picker.ShowDialog(dialog) == true) Choose(Path.GetDirectoryName(picker.FileName)!, Path.GetFileName(picker.FileName)); }));
-            panel.Children.Add(Ui.Button("Choose app folder…", (_, _) => { var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Find the installed app folder" }; if (picker.ShowDialog(dialog) == true) Choose(picker.FolderName, ""); }));
+            panel.Children.Add(Ui.Button("Choose app EXE…", (_, _) => { var picker = new Microsoft.Win32.OpenFileDialog { Title = "Find the installed app", Filter = "Application|*.exe" }; if (picker.ShowDialog(dialog) == true) Choose(Framework.GetDirectoryName(picker.FileName)!, Path.GetFileName(picker.FileName)); }));
+            panel.Children.Add(Ui.Button("Choose app folder…", (_, _) => { var picker = new FolderPicker { Title = "Find the installed app folder" }; if (picker.ShowDialog(dialog) == true) Choose(picker.FolderName, ""); }));
             panel.Children.Add(Ui.Button("Cancel", (_, _) => dialog.DialogResult = false));
             dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             if (dialog.ShowDialog() == true) { SafePersist(); StatusLabel.Text = app.InstallationMissing ? app.LocalStatus : "App location updated. " + app.LocalStatus; }
@@ -428,7 +428,7 @@ public partial class MainWindow : Window
                 MessageBox.Show(this, "No unique Windows uninstaller was found. Windows Installed apps will open so you can select the app. GROUT will watch its saved location and remove this entry when removal is confirmed. Choose Keep tracking if you cancel.", "Uninstall app");
                 var draft = AppLocationDraft.From(app);
                 var target = draft.FileName.Length > 0 ? Path.Combine(draft.Folder, draft.FileName) : draft.Folder;
-                if (Path.IsPathFullyQualified(target)) { AppUninstall.Begin(app, target); Persist(); }
+                if (Framework.IsPathFullyQualified(target)) { AppUninstall.Begin(app, target); Persist(); }
                 Process.Start(new ProcessStartInfo("ms-settings:appsfeatures") { UseShellExecute = true });
             }
         }

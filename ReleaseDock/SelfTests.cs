@@ -15,6 +15,7 @@ internal static class SelfTests
     private static void Check(bool condition, string reason) { if (!condition) throw new Exception(reason); }
     public static async Task Run()
     {
+        FrameworkTests.Run();
         AssetCompatibilityTests.Run();
         AppIdentityTests.Run();
         StorageCleanupTests.Run();
@@ -64,7 +65,7 @@ internal static class SelfTests
             File.Delete(manifest);
             File.WriteAllText(Path.Combine(install, "vrmod-manifest.json"), """{"version":"0.3.30"}""");
             Check(InstalledVersions.Read(install).Version == "0.3.30", "Version manifest fallback");
-            var ownExe = Environment.ProcessPath!;
+            var ownExe = Framework.ProcessPath!;
             Check(InstalledVersions.Read(ownExe).Version.Length > 0, "EXE version resource detection without execution");
             File.Delete(Path.Combine(install, "vrmod-manifest.json"));
             File.WriteAllText(Path.Combine(install, "unins000.exe"), "");
@@ -98,7 +99,7 @@ internal static class SelfTests
             try { await missing.Latest("a/b"); throw new Exception("Missing release accepted"); } catch (InvalidOperationException) { }
             var data = Encoding.UTF8.GetBytes("abc");
             using var downloads = new ReleaseClient(new Handler(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent(data) }));
-            var asset = new Asset("app.exe", "https://github.com/a/b/releases/download/v2/app.exe", 3, "sha256:" + Convert.ToHexString(SHA256.HashData(data)));
+            var asset = new Asset("app.exe", "https://github.com/a/b/releases/download/v2/app.exe", 3, "sha256:" + Framework.Hex(Framework.Hash(data)));
             var destination = Path.Combine(root, "app.exe");
             await downloads.Download(asset, destination, new Progress<double>(), CancellationToken.None);
             Check(File.ReadAllText(destination) == "abc", "Download and checksum");

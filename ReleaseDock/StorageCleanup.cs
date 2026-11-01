@@ -1,5 +1,5 @@
 using System.IO;
-using System.Text.Json;
+using ReleaseDock.Json;
 namespace ReleaseDock;
 public static class StorageCleanup
 {
@@ -15,7 +15,7 @@ public static class StorageCleanup
         {
             Add(app.InstallLocation); Add(app.AppFolder); Add(app.UpdateTarget);
             if (app.AppFolder.Length > 0 && app.AppFile.Length > 0) Add(Path.Combine(app.AppFolder, app.AppFile));
-            if (app.VersionSourceOverride.Length > 0) Add(Path.IsPathFullyQualified(app.VersionSourceOverride) ? app.VersionSourceOverride : Path.Combine(app.AppFolder, app.VersionSourceOverride));
+            if (app.VersionSourceOverride.Length > 0) Add(Framework.IsPathFullyQualified(app.VersionSourceOverride) ? app.VersionSourceOverride : Path.Combine(app.AppFolder, app.VersionSourceOverride));
         }
         return paths;
     }
@@ -66,7 +66,7 @@ public static class StorageCleanup
                 // Cache ownership does not override a saved live-app/version path.
                 // This also protects libraries created before destination checks existed.
                 if (installationPaths.Any(path => Overlaps(folder, path))) continue;
-                if (category == "downloads" && list.Any(a => !a.IsCurrent && Path.GetDirectoryName(a.DownloadedPath)?.Equals(folder, StringComparison.OrdinalIgnoreCase) == true)) continue;
+                if (category == "downloads" && list.Any(a => !a.IsCurrent && Framework.GetDirectoryName(a.DownloadedPath)?.Equals(folder, StringComparison.OrdinalIgnoreCase) == true)) continue;
                 if (category == "backups" && !SafeBackup(folder)) continue;
                 DeleteFolder(folder, root);
             }

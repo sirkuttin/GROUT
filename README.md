@@ -12,7 +12,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*Current 0.5.8 interface with sample data.*
+*Current 0.6.0 interface with sample data.*
 
 ## What it does
 
@@ -29,7 +29,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 2. Choose **Add App**, paste a supported repository or release link, then choose to track an existing app or install it.
 3. Choose the Windows download and how updates should work. GROUT shows the destination before applying file updates; ZIPs and portable EXEs overwrite matching files directly.
 
-The Windows x64 download is a **single portable EXE** with .NET included. No installer, adjacent DLLs or separate .NET installation is required. Your library and settings live in AppData; see [storage and cleanup](docs/user-guide.md#storage-and-cleanup).
+The Windows x64 download is a **single portable EXE under 1 MB**. It uses **.NET Framework 4.8**, already included with Windows 11, instead of bundling a runtime. No installer or adjacent DLLs are required. Your library and settings live in AppData; see [storage and cleanup](docs/user-guide.md#storage-and-cleanup).
 
 > **Early release:** the EXE is currently unsigned. Close third-party apps before updating their files. File updates start when you choose Update; external installers and GROUT self-updates have their own confirmation. Features on `main` may be newer than the latest release.
 

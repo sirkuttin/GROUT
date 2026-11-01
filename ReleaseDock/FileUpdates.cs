@@ -1,6 +1,6 @@
 using System.IO;
 using System.IO.Compression;
-using System.Text.Json;
+using ReleaseDock.Json;
 using System.Text.RegularExpressions;
 
 namespace ReleaseDock;
@@ -60,29 +60,31 @@ public static class FileUpdates
         var parts = name.Split('/');
         if (parts.Any(p => string.IsNullOrEmpty(p) || p is "." or ".." || p.EndsWith(' ') || p.EndsWith('.') || p.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || Regex.IsMatch(p, @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", RegexOptions.IgnoreCase)))
             throw new IOException("Unsafe archive path: " + name);
-        return string.Join(Path.DirectorySeparatorChar, parts);
+        return string.Join(Path.DirectorySeparatorChar.ToString(), parts);
     }
     public static string StageZip(string archive, string? stagingDirectory = null, CancellationToken cancellation = default)
     {
         cancellation.ThrowIfCancellationRequested();
         using var zip = ZipFile.OpenRead(archive);
         if (zip.Entries.Count > 10000 || zip.Entries.Sum(e => e.Length) > 8L * 1024 * 1024 * 1024) throw new IOException("Archive exceeds the 10,000-entry / 8 GB extraction limit.");
-        var files = new List<(ZipArchiveEntry Entry, string Path)>();
+        var checksums = ArchiveChecksums.Read(archive, zip.Entries.Count);
+        var files = new List<(ZipArchiveEntry Entry, string Path, uint Crc)>();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in zip.Entries)
+        foreach (var indexed in zip.Entries.Select((entry, index) => (entry, index)))
         {
+            var entry = indexed.entry;
             if (((entry.ExternalAttributes >> 16) & 0xF000) == 0xA000 || (entry.ExternalAttributes & (int)FileAttributes.ReparsePoint) != 0) throw new IOException("Archive links are not supported.");
             var name = entry.FullName.TrimEnd('/', '\\');
             var relative = SafeRelative(name);
             if (!names.Add(relative)) throw new IOException("Archive contains duplicate paths: " + name);
-            if (!entry.FullName.EndsWith('/') && !entry.FullName.EndsWith('\\')) files.Add((entry, relative));
+            if (!entry.FullName.EndsWith('/') && !entry.FullName.EndsWith('\\')) files.Add((entry, relative, checksums[indexed.index]));
         }
         if (files.Count == 0) throw new IOException("Archive has no files.");
         // Reject file/directory collisions before extracting anything.
         var fileNames = files.Select(f => f.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
-            for (var parent = Path.GetDirectoryName(file.Path); !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
-                if (fileNames.Contains(parent)) throw new IOException("Archive has conflicting file and directory names.");
+            for (var parent = Framework.GetDirectoryName(file.Path); !string.IsNullOrEmpty(parent); parent = Framework.GetDirectoryName(parent))
+                if (fileNames.Contains(parent!)) throw new IOException("Archive has conflicting file and directory names.");
         var staging = stagingDirectory ?? AppPaths.NewWork("staging");
         Directory.CreateDirectory(staging);
         if (Directory.EnumerateFileSystemEntries(staging).Any()) throw new IOException("Staging directory must be empty.");
@@ -91,7 +93,7 @@ public static class FileUpdates
         {
             cancellation.ThrowIfCancellationRequested();
             var path = Path.Combine(staging, file.Path);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            Directory.CreateDirectory(Framework.GetDirectoryName(path)!);
             using var source = file.Entry.Open();
             using var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             var buffer = new byte[81920]; int read; long entryBytes = 0; uint crc = 0xFFFFFFFF;
@@ -103,7 +105,7 @@ public static class FileUpdates
                 for (var i = 0; i < read; i++) crc = (crc >> 8) ^ Crc32Table[(crc ^ buffer[i]) & 0xFF];
                 target.Write(buffer, 0, read);
             }
-            if (entryBytes != file.Entry.Length || ~crc != file.Entry.Crc32) throw new IOException("Archive entry size or checksum did not match: " + file.Path);
+            if (entryBytes != file.Entry.Length || ~crc != file.Crc) throw new IOException("Archive entry size or checksum did not match: " + file.Path);
         }
         return staging;
     }
@@ -114,13 +116,13 @@ public static class FileUpdates
         var files = Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories);
         if (removeOuterFolder)
         {
-            var roots = files.Select(f => Path.GetRelativePath(sourceRoot, f).Split(Path.DirectorySeparatorChar)[0]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var roots = files.Select(f => Framework.GetRelativePath(sourceRoot, f).Split(Path.DirectorySeparatorChar)[0]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (roots.Count != 1 || !Directory.Exists(Path.Combine(sourceRoot, roots[0]))) throw new IOException("The archive does not have one outer folder to remove.");
             sourceRoot = Path.Combine(sourceRoot, roots[0]);
         }
         return files.Select(f =>
         {
-            var relative = SafeRelative(Path.GetRelativePath(sourceRoot, f));
+            var relative = SafeRelative(Framework.GetRelativePath(sourceRoot, f));
             var target = Path.Combine(destination, relative);
             NoLinks(target);
             var exists = File.Exists(target);
@@ -154,7 +156,7 @@ public static class FileUpdates
             if (file.Existed)
             {
                 var path = Path.Combine(backup, "files", SafeRelative(file.Relative));
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                Directory.CreateDirectory(Framework.GetDirectoryName(path)!);
                 File.Copy(file.Target, path);
             }
         }
@@ -167,7 +169,7 @@ public static class FileUpdates
             foreach (var file in selected)
             {
                 NoLinks(file.Target);
-                Directory.CreateDirectory(Path.GetDirectoryName(file.Target)!);
+                Directory.CreateDirectory(Framework.GetDirectoryName(file.Target)!);
                 AtomicCopy(file.Source, file.Target, file.Existed);
                 applied.Add(file);
             }
@@ -184,7 +186,7 @@ public static class FileUpdates
     private static void AtomicCopy(string source, string target, bool overwrite = true)
     {
         var temp = target + ".releasedock-" + Guid.NewGuid().ToString("N");
-        try { File.Copy(source, temp, false); File.Move(temp, target, overwrite); }
+        try { File.Copy(source, temp, false); Framework.Move(temp, target, overwrite); }
         finally { if (File.Exists(temp)) File.Delete(temp); }
     }
     private static void RestoreFiles(string backup, IEnumerable<UpdateFile> files)

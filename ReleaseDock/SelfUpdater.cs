@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
-using System.Text.Json;
+using ReleaseDock.Json;
 using System.Text.RegularExpressions;
 
 namespace ReleaseDock;
@@ -72,17 +72,17 @@ public sealed class SelfUpdater : IDisposable
         {
             using var response = await Get($"https://api.github.com/repos/{Repository}/releases/assets/{id}", true, cancel);
             if (response.Content.Headers.ContentType?.MediaType is "text/html" or "application/json") throw new IOException("GitHub returned a page instead of the update file.");
-            await using var input = await response.Content.ReadAsStreamAsync(cancel); await using var output = File.Create(destination);
+            using var input = await response.Content.ReadAsStreamAsync(cancel); using var output = File.Create(destination);
             var buffer = new byte[81920]; long total = 0; int count;
-            while ((count = await input.ReadAsync(buffer, cancel)) > 0) { total += count; if (total > limit) throw new IOException("Update asset exceeds its size limit."); await output.WriteAsync(buffer.AsMemory(0, count), cancel); }
+            while ((count = await input.ReadAsync(buffer, cancel)) > 0) { total += count; if (total > limit) throw new IOException("Update asset exceeds its size limit."); await output.WriteAsync(buffer, 0, count, cancel); }
         }
         Directory.CreateDirectory(folder);
         var sum = Path.Combine(folder, "SHA256SUMS.txt"); var path = Path.Combine(folder, "update.exe");
         await Copy(release.ChecksumId, sum, 65536);
-        var hash = Checksum(await File.ReadAllTextAsync(sum, cancel), release.ExeName);
+        var hash = Checksum(File.ReadAllText(sum), release.ExeName);
         await Copy(release.ExeId, path, 300L * 1024 * 1024);
-        await using var file = File.OpenRead(path);
-        if (!Convert.ToHexString(await SHA256.HashDataAsync(file, cancel)).Equals(hash, StringComparison.OrdinalIgnoreCase)) throw new IOException("Update checksum verification failed. Nothing was installed.");
+        using var file = File.OpenRead(path);
+        if (!Framework.Hex(await Framework.HashAsync(file, cancel)).Equals(hash, StringComparison.OrdinalIgnoreCase)) throw new IOException("Update checksum verification failed. Nothing was installed.");
         return (path, hash);
     }
     public void Dispose() => client.Dispose();

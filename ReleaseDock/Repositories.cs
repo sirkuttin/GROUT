@@ -23,7 +23,7 @@ public static class Repositories
             if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || host is not ("github.com" or "codeberg.org" or "gitlab.com")) throw new ArgumentException("Use a public HTTPS project link from GitHub, Codeberg or GitLab.com.");
             var path = uri.AbsolutePath.Trim('/');
             if (host == "gitlab.com") { var marker = path.IndexOf("/-/", StringComparison.Ordinal); if (marker >= 0) path = path[..marker]; }
-            else path = string.Join('/', path.Split('/').Take(2));
+            else path = string.Join("/", path.Split('/').Take(2));
             input = path;
         }
         if (input.EndsWith(".git", StringComparison.OrdinalIgnoreCase)) input = input[..^4];

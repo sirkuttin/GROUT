@@ -135,7 +135,7 @@ GROUT retains its original data-folder name for compatibility:
 
 Back up `apps.json` and `settings.json` to preserve configuration. Cleanup also removes obsolete files from older builds; locked files can wait for a later pass.
 
-The single EXE includes .NET. Native runtime components extract automatically into the .NET runtime cache at launch, separately from GROUT's data folder.
+From 0.6.0, the single EXE uses Windows-provided .NET Framework 4.8 and does not extract a bundled runtime. Windows 11 already includes the required Framework. Older 0.5.x builds used a separate .NET extraction cache.
 
 ### Stable executable name
 

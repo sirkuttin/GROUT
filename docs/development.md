@@ -5,7 +5,7 @@
 ## Requirements
 
 - Windows
-- .NET 10 SDK
+- .NET 10 SDK (build tools and the release-script runner; not an end-user prerequisite)
 - Git
 
 The project folder and internal namespace retain the older `ReleaseDock` name. The built executable is `GROUT.exe`.
@@ -18,14 +18,14 @@ From the repository root:
 dotnet build ReleaseDock/ReleaseDock.csproj -c Release
 ```
 
-Publish a self-contained Windows x64 single EXE:
+Build a portable Windows x64 single EXE:
 
 ```powershell
-dotnet publish ReleaseDock/ReleaseDock.csproj -c Release `
+dotnet build ReleaseDock/ReleaseDock.csproj -c Release `
   -p:PublishProfile=Portable-win-x64 -o outputs/portable
 ```
 
-The profile bundles native libraries and embedded debug symbols, with compression. The .NET desktop runtime accounts for most of the EXE's size; native runtime components extract into the .NET runtime cache at launch.
+GROUT targets .NET Framework 4.8 and uses the assemblies supplied by Windows. The SDK restores the reference assemblies automatically for compilation; no developer pack or runtime DLLs are shipped. The build profile suppresses debug/config output and targets x64. The release script requires exactly one EXE under 1,000,000 bytes and runs it without a config file or adjacent DLLs.
 
 For a build that also runs packaged tests and generates checksums/license notices, use the [release script in local-only mode](releasing.md#build-and-test-without-publishing).
 
@@ -77,7 +77,7 @@ Documentation [screenshots](images/) come from these previews. Build the current
 
 The release script cleans its successful temporary EXE/test report after copying verified outputs. Failed builds stay under `work/` for diagnosis.
 
-GROUT is [MIT licensed](../LICENSE). Runtime files in [licenses/](../licenses/) are embedded in the EXE and included with release artifacts. They came from the .NET 10.0.14 runtime packs; review them when updating the bundled runtime.
+GROUT is [MIT licensed](../LICENSE). The [runtime prerequisite notice](../licenses/WINDOWS-FRAMEWORK.txt) is embedded with the GROUT license and included in release artifacts. No .NET runtime is redistributed. Earlier 0.5.x releases bundled .NET 10 and included its redistribution notices.
 
 ## App icon
 
@@ -89,3 +89,9 @@ dotnet tool run dotnet-script -- scripts/create-icon.csx
 ```
 
 The generator uses pinned `System.Drawing.Common` tooling and emits 16, 24, 32, 48, 64, 128 and 256 pixel ICO entries. `--output FOLDER` changes the destination; unknown flags fail with usage.
+
+## .NET Framework compatibility
+
+The app uses Windows Framework assemblies only. FrameworkJson maps the existing JSON format through the built-in parser, preserving ISO dates, 64-bit identifiers, records and ignored runtime-only fields. FrameworkSupport supplies process waiting, argument quoting, SHA-256 and atomic file replacement. FolderDialogs uses the Windows Common Item Dialog. ArchiveChecksums reads central-directory CRCs because Framework's ZIP entry API does not expose them. Portable EXE header validation remains enabled.
+
+The packaged suite includes old-format data and updater plans, strict JSON types, Unicode/date roundtrips, native folder-dialog configuration, ZIP corruption/path checks, portable EXE checks, and isolated updater restart/rollback scenarios.

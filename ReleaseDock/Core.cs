@@ -1,8 +1,8 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using ReleaseDock.Json;
+
 using System.Text.RegularExpressions;
 
 namespace ReleaseDock;
@@ -66,8 +66,8 @@ public sealed class Store(string path)
     public List<TrackedApp> Load() => File.Exists(path) ? JsonSerializer.Deserialize<List<TrackedApp>>(File.ReadAllText(path)) ?? [] : [];
     public void Save(IEnumerable<TrackedApp> apps)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        Directory.CreateDirectory(Framework.GetDirectoryName(path)!);
         File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(apps, new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(path + ".tmp", path, true);
+        Framework.Move(path + ".tmp", path, true);
     }
 }

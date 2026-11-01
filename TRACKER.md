@@ -252,3 +252,9 @@
 ## 0.5.8 release
 - GROUT check and update buttons are mutually exclusive. Available updates show Update GROUT; restart behavior is unchanged.
 - Updated current documentation and screenshots; full packaged suite required for publication.
+
+## 0.6.0 Framework port — under 1 MB
+- User approved using Windows-provided .NET Framework 4.8, preserving WPF/C#, the UI and existing library format. Runtime is no longer bundled.
+- Replaced modern-only APIs with Framework implementations; native modern folder picker, ZIP CRC/PE checks, atomic replacement and updater rollback retained. No external runtime DLLs.
+- Release script builds and tests a single EXE with a strict under-1,000,000-byte budget. Legacy runtime redistribution notices removed; Windows prerequisite notice included.
+- Packaged suite passed: 15 new Framework compatibility assertions plus all existing regressions. EXE measured 449,536 bytes before final documentation cleanup. Additional direct old-to-new upgrade and live-provider smoke commands were blocked by automatic approval review; not claimed as verified.

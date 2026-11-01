@@ -1,5 +1,5 @@
 using System.IO;
-using System.Text.Json;
+using ReleaseDock.Json;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -217,9 +217,9 @@ public sealed class SetupWindow : Window
         FixedFooter(actions);
         ComboBox? use = null; TextBox? folder = null, filename = null;
         string selectedMethod = "";
-        string destinationFolder = Directory.Exists(Result.UpdateTarget) || !Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Result.UpdateTarget : Path.GetDirectoryName(Result.UpdateTarget) ?? "";
+        string destinationFolder = Directory.Exists(Result.UpdateTarget) || !Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Result.UpdateTarget : Framework.GetDirectoryName(Result.UpdateTarget) ?? "";
         if (destinationFolder.Length == 0) destinationFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "apps");
-        if (Result.UpdateMethod == "Zip" && Result.UpdateTarget.Length > 0 && Path.GetDirectoryName(Result.UpdateTarget) is { Length: > 0 } zipParent && string.Equals(SetupPaths.PortableZip(zipParent, Result.AppName), Result.UpdateTarget, StringComparison.OrdinalIgnoreCase)) destinationFolder = zipParent;
+        if (Result.UpdateMethod == "Zip" && Result.UpdateTarget.Length > 0 && Framework.GetDirectoryName(Result.UpdateTarget) is { Length: > 0 } zipParent && string.Equals(SetupPaths.PortableZip(zipParent, Result.AppName), Result.UpdateTarget, StringComparison.OrdinalIgnoreCase)) destinationFolder = zipParent;
         string chosenFilename = Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(Result.UpdateTarget) : "";
         void Configure()
         {
@@ -250,7 +250,7 @@ public sealed class SetupWindow : Window
                 {
                     destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "Save in folder" : "Create app folder inside", 18));
                     folder = Ui.Input(destinationFolder); System.Windows.Automation.AutomationProperties.SetName(folder, "Save in folder"); destination.Children.Add(folder);
-                    destination.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new OpenFolderDialog { Title = "Choose where to save the app" }; if (picker.ShowDialog(this) == true) folder.Text = picker.FolderName; }));
+                    destination.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new FolderPicker { Title = "Choose where to save the app" }; if (picker.ShowDialog(this) == true) folder.Text = picker.FolderName; }));
                     if (selectedMethod == "ReplaceExe")
                     {
                         destination.Children.Add(Ui.Text("Filename", muted: true)); filename = Ui.Input(chosenFilename.Length > 0 ? chosenFilename : asset.Name); System.Windows.Automation.AutomationProperties.SetName(filename, "Filename"); destination.Children.Add(filename);
@@ -366,7 +366,7 @@ public sealed class SetupWindow : Window
     private void PickLocation(bool file)
     {
         if (file) { var picker = new OpenFileDialog { Filter = "Version sources|*.exe;*.json|All files|*.*" }; if (picker.ShowDialog(this) != true) return; location.Text = picker.FileName; }
-        else { var picker = new OpenFolderDialog(); if (picker.ShowDialog(this) != true) return; location.Text = picker.FolderName; }
+        else { var picker = new FolderPicker(); if (picker.ShowDialog(this) != true) return; location.Text = picker.FolderName; }
         Detect();
         if (newInstall) return;
         if (string.IsNullOrWhiteSpace(target.Text)) target.Text = location.Text.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || Directory.Exists(location.Text) ? location.Text : "";

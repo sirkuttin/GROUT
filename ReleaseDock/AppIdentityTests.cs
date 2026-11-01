@@ -20,10 +20,10 @@ internal static class AppIdentityTests
             var real = Path.Combine(root, "real");
             Directory.CreateDirectory(Path.Combine(real, "MyApp"));
             var createJunction = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            createJunction.ArgumentList.Add("-NoProfile");
-            createJunction.ArgumentList.Add("-NonInteractive");
-            createJunction.ArgumentList.Add("-Command");
-            createJunction.ArgumentList.Add("$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path '" + junction.Replace("'", "''") + "' -Target '" + real.Replace("'", "''") + "' | Out-Null");
+            createJunction.AddArgument("-NoProfile");
+            createJunction.AddArgument("-NonInteractive");
+            createJunction.AddArgument("-Command");
+            createJunction.AddArgument("$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path '" + junction.Replace("'", "''") + "' -Target '" + real.Replace("'", "''") + "' | Out-Null");
             using (var process = System.Diagnostics.Process.Start(createJunction)!)
             {
                 process.WaitForExit();

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text.Json;
+using ReleaseDock.Json;
 namespace ReleaseDock;
 
 public sealed record SelfUpdatePlan(int ParentPid, long ParentStart, string Target, string Package, string Hash, string TestReport = "", string OriginalTarget = "", string OriginalHash = "", bool TestFailStartup = false);
@@ -10,7 +10,7 @@ public static class SelfUpdateHandoff
     public static string WorkRoot => Path.Combine(AppPaths.Data, "self-update");
     public static string ValidatePlanPath(string planFile)
     {
-        var folder = Path.GetDirectoryName(Path.GetFullPath(planFile))!;
+        var folder = Framework.GetDirectoryName(Path.GetFullPath(planFile))!;
         if (!folder.StartsWith(Path.GetFullPath(WorkRoot) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || Path.GetFileName(planFile) != "plan.json") throw new IOException("Invalid self-update workspace.");
         FileUpdates.NoLinks(folder);
         return folder;
@@ -20,7 +20,7 @@ public static class SelfUpdateHandoff
         using var file = File.OpenRead(package);
         if (file.Length < 2 || file.ReadByte() != 'M' || file.ReadByte() != 'Z') throw new IOException("Update is not a Windows executable.");
         file.Position = 0;
-        if (!Convert.ToHexString(SHA256.HashData(file)).Equals(hash, StringComparison.OrdinalIgnoreCase)) throw new IOException("Self-update checksum mismatch.");
+        if (!Framework.Hex(Framework.Hash(file)).Equals(hash, StringComparison.OrdinalIgnoreCase)) throw new IOException("Self-update checksum mismatch.");
     }
     public static void Replace(string package, string target, string hash, Action launch)
     {
@@ -35,7 +35,7 @@ public static class SelfUpdateHandoff
         }
         catch
         {
-            if (replaced && File.Exists(backup)) File.Move(backup, target, true);
+            if (replaced && File.Exists(backup)) Framework.Move(backup, target, true);
             throw;
         }
         finally { if (File.Exists(next)) File.Delete(next); }
@@ -44,12 +44,12 @@ public static class SelfUpdateHandoff
     public static async Task<Process> Start(string package, string hash, string folder, string testReport = "", bool testFailStartup = false)
     {
         using var parent = Process.GetCurrentProcess();
-        var plan = new SelfUpdatePlan(parent.Id, parent.StartTime.ToUniversalTime().Ticks, Environment.ProcessPath!, package, hash, testReport, TestFailStartup: testFailStartup);
+        var plan = new SelfUpdatePlan(parent.Id, parent.StartTime.ToUniversalTime().Ticks, Framework.ProcessPath!, package, hash, testReport, TestFailStartup: testFailStartup);
         Verify(package, hash);
         var planFile = Path.Combine(folder, "plan.json");
         File.WriteAllText(planFile, JsonSerializer.Serialize(plan)); ValidatePlanPath(planFile);
         var start = new ProcessStartInfo(package) { UseShellExecute = true, WorkingDirectory = folder };
-        start.ArgumentList.Add("--apply-self-update"); start.ArgumentList.Add("--plan"); start.ArgumentList.Add(planFile);
+        start.AddArgument("--apply-self-update"); start.AddArgument("--plan"); start.AddArgument(planFile);
         var helper = Process.Start(start) ?? throw new IOException("Update helper could not start.");
         for (var i = 0; i < 150; i++)
         {
@@ -71,8 +71,8 @@ public static class SelfUpdateHandoff
         {
             folder = ValidatePlanPath(planFile);
             plan = JsonSerializer.Deserialize<SelfUpdatePlan>(File.ReadAllText(planFile)) ?? throw new IOException("Invalid update plan.");
-            if (!Path.GetFullPath(plan.Package).Equals(Path.Combine(folder, "update.exe"), StringComparison.OrdinalIgnoreCase) || !Path.GetFullPath(plan.Package).Equals(Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new IOException("Unexpected update helper location.");
-            if (!Path.IsPathFullyQualified(plan.Target) || !plan.Target.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid update target.");
+            if (!Path.GetFullPath(plan.Package).Equals(Path.Combine(folder, "update.exe"), StringComparison.OrdinalIgnoreCase) || !Path.GetFullPath(plan.Package).Equals(Framework.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new IOException("Unexpected update helper location.");
+            if (!Framework.IsPathFullyQualified(plan.Target) || !plan.Target.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid update target.");
             using var parent = Process.GetProcessById(plan.ParentPid);
             if (parent.StartTime.ToUniversalTime().Ticks != plan.ParentStart || !string.Equals(parent.MainModule?.FileName, plan.Target, StringComparison.OrdinalIgnoreCase)) throw new IOException("The running GROUT instance does not match the update target.");
             Verify(plan.Package, plan.Hash); FileUpdates.NoLinks(plan.Target);
@@ -81,7 +81,7 @@ public static class SelfUpdateHandoff
             SelfUpdateMigration.CheckDestination(oldTarget, destination);
             if (!destination.Equals(oldTarget, StringComparison.OrdinalIgnoreCase))
             {
-                string oldHash; using (var file = File.OpenRead(oldTarget)) oldHash = Convert.ToHexString(SHA256.HashData(file));
+                string oldHash; using (var file = File.OpenRead(oldTarget)) oldHash = Framework.Hex(Framework.Hash(file));
                 plan = plan with { Target = destination, OriginalTarget = oldTarget, OriginalHash = oldHash };
                 File.WriteAllText(planFile, JsonSerializer.Serialize(plan));
             }
@@ -92,9 +92,9 @@ public static class SelfUpdateHandoff
             await parent.WaitForExitAsync(timeout.Token);
             parentExited = true;
             await Task.Delay(500);
-            var start = new ProcessStartInfo(plan.Target) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(plan.Target)! };
-            start.ArgumentList.Add("--finish-self-update"); start.ArgumentList.Add("--plan"); start.ArgumentList.Add(planFile);
-            start.ArgumentList.Add("--helper-pid"); start.ArgumentList.Add(Environment.ProcessId.ToString());
+            var start = new ProcessStartInfo(plan.Target) { UseShellExecute = true, WorkingDirectory = Framework.GetDirectoryName(plan.Target)! };
+            start.AddArgument("--finish-self-update"); start.AddArgument("--plan"); start.AddArgument(planFile);
+            start.AddArgument("--helper-pid"); start.AddArgument(Framework.ProcessId.ToString());
             SelfUpdateMigration.Install(plan.Package, oldTarget, plan.Target, plan.Hash, () =>
             {
                 using var restarted = Process.Start(start) ?? throw new IOException("Updated GROUT could not restart.");
@@ -116,7 +116,7 @@ public static class SelfUpdateHandoff
     {
         var folder = ValidatePlanPath(planFile);
         var plan = JsonSerializer.Deserialize<SelfUpdatePlan>(File.ReadAllText(planFile)) ?? throw new IOException("Invalid update plan.");
-        if (!string.Equals(plan.Target, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new IOException("Unexpected self-update restart target.");
+        if (!string.Equals(plan.Target, Framework.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new IOException("Unexpected self-update restart target.");
         return plan;
     }
     public static void WaitForStarted(Process restarted, string folder, string expectedHash)

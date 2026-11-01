@@ -61,10 +61,10 @@ public sealed class InstallDiscovery(Func<IReadOnlyList<InstalledRegistration>>?
             var related = identities.Any(n => n.Length >= 5 && (name.Contains(n) || n.Contains(name) && name.Length >= 5));
             if (!exact && !related) continue;
             var folder = Environment.ExpandEnvironmentVariables(entry.Location.Trim().Trim('"')).TrimEnd('\\', '/');
-            if (folder.Length == 0 && icon.Length > 0) folder = Path.GetDirectoryName(icon) ?? "";
-            if (folder.Length == 0) folder = Path.GetDirectoryName(ExePath(entry.Uninstall)) ?? "";
-            if (!Path.IsPathFullyQualified(folder) || folder.StartsWith(@"\\") || !Directory.Exists(folder)) continue;
-            var filename = icon.Length > 0 && File.Exists(icon) && string.Equals(Path.GetDirectoryName(icon)?.TrimEnd('\\'), folder, StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(Path.GetFileName(icon), "(?i)unins|setup|installer|update|crash") ? Path.GetFileName(icon) : "";
+            if (folder.Length == 0 && icon.Length > 0) folder = Framework.GetDirectoryName(icon) ?? "";
+            if (folder.Length == 0) folder = Framework.GetDirectoryName(ExePath(entry.Uninstall)) ?? "";
+            if (!Framework.IsPathFullyQualified(folder) || folder.StartsWith(@"\\") || !Directory.Exists(folder)) continue;
+            var filename = icon.Length > 0 && File.Exists(icon) && string.Equals(Framework.GetDirectoryName(icon)?.TrimEnd('\\'), folder, StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(Path.GetFileName(icon), "(?i)unins|setup|installer|update|crash") ? Path.GetFileName(icon) : "";
             var changed = before != null && (!previous.TryGetValue(entry.Id, out var old) || old != entry);
             var score = (exact ? 100 : 55) + (changed ? 25 : 0) + (InstalledVersions.Matches(entry.Version, app.Latest) ? 10 : 0);
             found.Add(new(entry, folder, filename, score, changed));

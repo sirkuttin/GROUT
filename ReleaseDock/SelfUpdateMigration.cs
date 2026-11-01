@@ -6,7 +6,7 @@ namespace ReleaseDock;
 public static class SelfUpdateMigration
 {
     public static string Destination(string current)
-        => Regex.IsMatch(Path.GetFileName(current), @"^GROUT-\d+\.\d+\.\d+-win-x64\.exe$", RegexOptions.IgnoreCase) ? Path.Combine(Path.GetDirectoryName(current)!, "GROUT.exe") : current;
+        => Regex.IsMatch(Path.GetFileName(current), @"^GROUT-\d+\.\d+\.\d+-win-x64\.exe$", RegexOptions.IgnoreCase) ? Path.Combine(Framework.GetDirectoryName(current)!, "GROUT.exe") : current;
     public static void CheckDestination(string current, string destination)
     {
         FileUpdates.NoLinks(destination);
@@ -66,7 +66,7 @@ public static class SelfUpdateMigration
     {
         if (plan.OriginalTarget.Length == 0 || !string.Equals(Destination(plan.OriginalTarget), plan.Target, StringComparison.OrdinalIgnoreCase) || string.Equals(plan.Target, plan.OriginalTarget, StringComparison.OrdinalIgnoreCase) || !File.Exists(plan.OriginalTarget)) return;
         FileUpdates.NoLinks(plan.OriginalTarget);
-        string hash; using (var file = File.OpenRead(plan.OriginalTarget)) hash = Convert.ToHexString(SHA256.HashData(file));
+        string hash; using (var file = File.OpenRead(plan.OriginalTarget)) hash = Framework.Hex(Framework.Hash(file));
         if (hash.Equals(plan.OriginalHash, StringComparison.OrdinalIgnoreCase)) File.Delete(plan.OriginalTarget);
     }
 }

@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Text.Json;
+using ReleaseDock.Json;
 
 namespace ReleaseDock;
 

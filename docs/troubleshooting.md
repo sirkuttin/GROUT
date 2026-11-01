@@ -64,13 +64,13 @@ ZIP installs and updates apply every archive file directly, including matching s
 
 Use **Check GROUT updates**, beside **Settings** at the bottom right, to retry. Only newer stable releases with the expected Windows x64 EXE and checksum file are offered. Previews and older versions are not installed.
 
-Version 0.4.x needs a manual upgrade to 0.5.0 first. Keep the EXE in a permanent writable folder; protected locations may require manual replacement. Self-updates require no GitHub CLI or authentication.
+Version 0.4.x needs a manual upgrade to the latest release. Keep the EXE in a permanent writable folder; protected locations may require manual replacement. Self-updates require no GitHub CLI or authentication.
 
 ## Storage seems larger than expected
 
 Configuration is in `%LOCALAPPDATA%\ReleaseDock`, retaining GROUT's original folder name. Pending/manual downloads remain until installation is resolved. Completed downloads, ZIP staging and completed rollback copies are cleaned automatically; locked files may wait for a later pass. Interrupted recovery is kept for repair.
 
-The .NET extraction cache is separate. See [storage and cleanup](user-guide.md#storage-and-cleanup) for the inventory.
+From 0.6.0, GROUT uses Windows-provided .NET Framework and does not create a bundled-runtime extraction cache. An older 0.5.x build may have left one. See [storage and cleanup](user-guide.md#storage-and-cleanup) for the inventory.
 
 ## Report a problem
 

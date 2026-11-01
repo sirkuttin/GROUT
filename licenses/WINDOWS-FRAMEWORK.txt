@@ -1,0 +1,8 @@
+GROUT runtime prerequisite
+
+GROUT targets Microsoft .NET Framework 4.8 and uses the Framework assemblies
+provided by Windows. It does not redistribute a .NET runtime or third-party
+runtime libraries. Windows 11 includes .NET Framework 4.8 or 4.8.1.
+
+Microsoft .NET Framework is licensed and serviced separately by Microsoft as
+part of Windows. GROUT's own source code is licensed under the MIT license.

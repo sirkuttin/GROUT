@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
+using ReleaseDock.Json;
 using System.Text.RegularExpressions;
 
 namespace ReleaseDock;
@@ -40,7 +40,7 @@ public static class InstalledVersions
             version = string.IsNullOrWhiteSpace(info.ProductVersion) ? info.FileVersion : info.ProductVersion;
         }
         else throw new InvalidOperationException("Select an install folder, an EXE, or a JSON version manifest.");
-        if (string.IsNullOrWhiteSpace(version) || version.Length > 160 || version.Any(char.IsControl)) throw new InvalidOperationException("No usable version found. Last known version kept.");
+        if (version == null || string.IsNullOrWhiteSpace(version) || version.Length > 160 || version.Any(char.IsControl)) throw new InvalidOperationException("No usable version found. Last known version kept.");
         return new(version.Trim(), location);
     }
 

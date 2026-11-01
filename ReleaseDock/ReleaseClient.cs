@@ -1,7 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Text.Json;
+using ReleaseDock.Json;
 using System.Text.RegularExpressions;
 
 namespace ReleaseDock;
@@ -25,7 +25,7 @@ public sealed class ReleaseClient : IDisposable
         if (backoffs.TryGetValue(repository.Host, out var pause) && pause > DateTimeOffset.UtcNow) throw new InvalidOperationException($"{repository.Name} requests paused until {pause.ToLocalTime():g}.");
         var response = await Follow(new Uri(url), HttpCompletionOption.ResponseContentRead, cancellation, new Uri(repository.ApiUrl).Host);
         if (response.StatusCode == HttpStatusCode.Unauthorized) { response.Dispose(); throw new InvalidOperationException($"{repository.Name} requires authentication for this resource. This version supports public projects only."); }
-        if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
+        if (response.StatusCode is HttpStatusCode.Forbidden or (HttpStatusCode)429)
         {
             var next = DateTimeOffset.UtcNow.AddHours(1);
             foreach (var header in new[] { "X-RateLimit-Reset", "RateLimit-Reset" })
@@ -36,7 +36,7 @@ public sealed class ReleaseClient : IDisposable
             response.Dispose();
             throw new InvalidOperationException($"{repository.Name} limit or access restriction reached. Its checks pause until {backoffs[repository.Host].ToLocalTime():g}.");
         }
-        if (string.Equals(response.Content.Headers.ContentType?.MediaType, "text/html", StringComparison.OrdinalIgnoreCase)) { response.Dispose(); throw new IOException($"{repository.Name} returned a web/login page instead of project metadata. Check public access."); }
+        if (string.Equals(response.Content?.Headers.ContentType?.MediaType, "text/html", StringComparison.OrdinalIgnoreCase)) { response.Dispose(); throw new IOException($"{repository.Name} returned a web/login page instead of project metadata. Check public access."); }
         return response;
     }
     public async Task VerifyRepository(string repo)
@@ -96,7 +96,7 @@ public sealed class ReleaseClient : IDisposable
         }
         var web = release.TryGetProperty("_links", out var releaseLinks) ? Text(releaseLinks, "self") : "";
         if (!Uri.TryCreate(web, UriKind.Absolute, out var webUri) || webUri.Scheme != "https" || webUri.Host != "gitlab.com") web = reference.ReleasesUrl + "/" + Uri.EscapeDataString(Text(release, "tag_name"));
-        return new(Text(release, "tag_name"), web, Text(release, "description"), assets.DistinctBy(a => a.Url).ToList());
+        return new(Text(release, "tag_name"), web, Text(release, "description"), assets.GroupBy(a => a.Url).Select(g => g.First()).ToList());
     }
     public static bool IsPreviewTag(string tag) => Regex.IsMatch(tag, @"(?:alpha|beta|preview|nightly|snapshot|rc|dev|pre)(?:[-_.]?\d+)?(?:$|[-_.])", RegexOptions.IgnoreCase);
     private static void ValidateUrl(Uri uri, string? metadataHost = null)
@@ -132,27 +132,28 @@ public sealed class ReleaseClient : IDisposable
         {
             using var response = await Follow(uri, HttpCompletionOption.ResponseHeadersRead, cancellation);
             response.EnsureSuccessStatusCode();
-            if (string.Equals(response.Content.Headers.ContentType?.MediaType, "text/html", StringComparison.OrdinalIgnoreCase) || string.Equals(response.Content.Headers.ContentType?.MediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase)) throw new IOException("This asset returned a web/login page instead of an app file. Check the release link and public access.");
+            if (string.Equals(response.Content?.Headers.ContentType?.MediaType, "text/html", StringComparison.OrdinalIgnoreCase) || string.Equals(response.Content?.Headers.ContentType?.MediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase)) throw new IOException("This asset returned a web/login page instead of an app file. Check the release link and public access.");
+            if (response.Content == null) throw new IOException("The release download returned no content.");
             var expectedSize = asset.Size >= 0 ? asset.Size : response.Content.Headers.ContentLength;
-            await using (var source = await response.Content.ReadAsStreamAsync(cancellation))
-            await using (var target = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            using (var source = await response.Content.ReadAsStreamAsync(cancellation))
+            using (var target = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
                 var buffer = new byte[81920]; long total = 0; int read;
                 while ((read = await source.ReadAsync(buffer, cancellation)) > 0)
                 {
                     if (expectedSize.HasValue && read > expectedSize.Value - total) throw new IOException("Download exceeded the release or response metadata size.");
-                    await target.WriteAsync(buffer.AsMemory(0, read), cancellation); total += read;
+                    await target.WriteAsync(buffer, 0, read, cancellation); total += read;
                     progress.Report(expectedSize > 0 ? Math.Min(100, total * 100d / expectedSize.Value) : 0);
                 }
                 if (expectedSize.HasValue && total != expectedSize.Value) throw new IOException("Download size did not match the release or response metadata.");
             }
             if (asset.Digest?.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) == true)
             {
-                await using var file = File.OpenRead(partial);
-                var hash = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(file, cancellation));
+                using var file = File.OpenRead(partial);
+                var hash = Framework.Hex(await Framework.HashAsync(file, cancellation));
                 if (!hash.Equals(asset.Digest[7..], StringComparison.OrdinalIgnoreCase)) throw new IOException("Download checksum did not match.");
             }
-            File.Move(partial, destination, true);
+            Framework.Move(partial, destination, true);
         }
         finally { if (File.Exists(partial)) File.Delete(partial); }
     }

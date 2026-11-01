@@ -26,11 +26,11 @@ public partial class App : Application
                 var completed = SelfUpdateHandoff.Finish(e.Args[2], helperPid);
                 if (completed.TestReport.Length > 0)
                 {
-                    SelfUpdateTests.ValidateTestRoot(Path.GetDirectoryName(completed.Target)!);
-                    if (completed.TestReport != Path.Combine(Path.GetDirectoryName(completed.Target)!, "restarted.txt")) throw new IOException("Invalid smoke-test report.");
+                    SelfUpdateTests.ValidateTestRoot(Framework.GetDirectoryName(completed.Target)!);
+                    if (completed.TestReport != Path.Combine(Framework.GetDirectoryName(completed.Target)!, "restarted.txt")) throw new IOException("Invalid smoke-test report.");
                     if (completed.TestFailStartup) { Shutdown(1); return; }
                     SelfUpdateHandoff.ConfirmStarted(e.Args[2], helperPid);
-                    File.WriteAllText(completed.TestReport + ".tmp", "PASS: replacement restarted\n" + Environment.ProcessId); File.Move(completed.TestReport + ".tmp", completed.TestReport); Shutdown(0); return;
+                    File.WriteAllText(completed.TestReport + ".tmp", "PASS: replacement restarted\n" + Framework.ProcessId); File.Move(completed.TestReport + ".tmp", completed.TestReport); Shutdown(0); return;
                 }
             }
             catch (Exception ex) { MessageBox.Show(ex.Message, "GROUT update restart"); Shutdown(1); return; }
@@ -60,7 +60,7 @@ public partial class App : Application
                 {
                     using var github = new ReleaseClient();
                     var release = await github.Latest(repo, true);
-                    File.WriteAllText(reportPath, $"{release.Tag}\n{string.Join('\n', release.Assets.Select(a => a.Name))}");
+                    File.WriteAllText(reportPath, $"{release.Tag}\n{string.Join("\n", release.Assets.Select(a => a.Name))}");
                     Shutdown(0);
                 }
                 catch (Exception ex) { File.WriteAllText(reportPath, ex.ToString()); Shutdown(1); }
@@ -68,7 +68,7 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {SelfUpdateTests.Assertions} self-update, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }
