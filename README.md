@@ -23,7 +23,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 ## Get started
 
-1. Download the EXE from the [latest release](https://github.com/sirkuttin/GROUT/releases/latest), save it in a permanent writable folder, and run it. You can rename it to `GROUT.exe`.
+1. Download the EXE from the [latest release](https://github.com/sirkuttin/GROUT/releases/latest), save it in a permanent writable folder, and run it.
 2. Choose **Add App**, paste a supported repository or release link, then choose to track an existing app or install it.
 3. Choose the Windows download and how updates should work. GROUT shows the destination before applying file updates.
 
