@@ -37,6 +37,7 @@ public partial class App : Application
         }
         if (e.Args.Length > 0 && e.Args is not ["--tray"] && !selfRestart)
         {
+            if (e.Args is ["--preview-zip-selection", var zipOutput]) { ZipSelectionTests.Preview(zipOutput); Shutdown(); return; }
             if (e.Args is ["--check-self-update", var selfReport])
             {
                 try { using var updater = new SelfUpdater(); using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)); var latest = await updater.Check(timeout.Token); File.WriteAllText(selfReport, latest != null ? $"GROUT {latest.Version} available\n{latest.Page}" : $"GROUT {SelfUpdater.CurrentLabel}: no newer stable release."); Shutdown(0); }
@@ -68,13 +69,22 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }
-            if (e.Args is ["--preview" or "--preview-missing", var output])
+            if (e.Args is ["--preview" or "--preview-missing" or "--preview-nexus", var output])
             {
                 var window = new MainWindow(true);
+                if (e.Args[0] == "--preview-nexus")
+                {
+                    var library = (System.Windows.Controls.ListBox)window.FindName("Library");
+                    var sample = (TrackedApp)library.SelectedItem;
+                    sample.Repo = "https://nexusmods.com/examplegame/mods/123"; sample.Installed = "1.0.0"; sample.Latest = "2.0.0";
+                    sample.NexusFileId = 22; sample.AssetName = "ExampleTool.zip"; sample.UpdateMethod = "Zip"; sample.UpdateTarget = @"C:\Apps\ExampleTool";
+                    sample.Release = new("2.0.0", sample.RepositoryUrl + "?tab=files", "Sample Nexus release notes.", [new("ExampleTool.zip", "https://api.nexusmods.com/v1/games/examplegame/mods/123/files/22.json", -1, null, "nexusmods.com", 22, "2.0.0")], 22, "Example Nexus tool");
+                    library.SelectedItem = null; library.SelectedItem = sample; library.Items.Refresh();
+                }
                 if (e.Args[0] == "--preview-missing")
                 {
                     var library = (System.Windows.Controls.ListBox)window.FindName("Library");
@@ -116,7 +126,7 @@ public partial class App : Application
                 window.Close(); Shutdown(); return;
             }
             var help = e.Args is ["--help"] or ["-h"];
-            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
+            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-zip-selection PNG_PATH | --preview-nexus PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
             Shutdown(help ? 0 : 2); return;
         }
         instance = new Mutex(true, @"Local\ReleaseDock-" + Environment.UserName, out var first);
@@ -130,7 +140,7 @@ public partial class App : Application
             else Shutdown(1);
         }
     }
-    private static void SavePreview(Window window, string output)
+    internal static void SavePreview(Window window, string output)
     {
         window.UpdateLayout();
         var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);

@@ -9,12 +9,14 @@ namespace ReleaseDock;
 public sealed class ReleaseClient : IDisposable
 {
     private readonly HttpClient client;
+    public NexusMods Nexus { get; }
     private readonly Dictionary<string, DateTimeOffset> backoffs = new(StringComparer.OrdinalIgnoreCase);
     public DateTimeOffset? RetryAfter => backoffs.Values.Where(t => t > DateTimeOffset.UtcNow).Select(t => (DateTimeOffset?)t).Min();
-    public Dictionary<string, DateTimeOffset> Backoffs => backoffs.Where(p => p.Value > DateTimeOffset.UtcNow).ToDictionary(p => p.Key, p => p.Value);
-    public void RestoreBackoffs(Dictionary<string, DateTimeOffset> saved) { foreach (var pair in saved.Where(p => p.Key is "github.com" or "codeberg.org" or "gitlab.com")) backoffs[pair.Key] = pair.Value; }
-    public ReleaseClient(HttpMessageHandler? handler = null)
+    public Dictionary<string, DateTimeOffset> Backoffs { get { if (Nexus.PausedUntil is { } pause) backoffs["nexusmods.com"] = pause; return backoffs.Where(p => p.Value > DateTimeOffset.UtcNow).ToDictionary(p => p.Key, p => p.Value); } }
+    public void RestoreBackoffs(Dictionary<string, DateTimeOffset> saved) { if (saved.TryGetValue("nexusmods.com", out var pause)) Nexus.PausedUntil = pause; foreach (var pair in saved.Where(p => p.Key is "github.com" or "codeberg.org" or "gitlab.com")) backoffs[pair.Key] = pair.Value; }
+    public ReleaseClient(HttpMessageHandler? handler = null, NexusMods? nexus = null)
     {
+        Nexus = nexus ?? new NexusMods();
         client = handler == null ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) : new HttpClient(handler);
         client.Timeout = TimeSpan.FromMinutes(10);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("GROUT/0.4");
@@ -42,14 +44,16 @@ public sealed class ReleaseClient : IDisposable
     public async Task VerifyRepository(string repo)
     {
         var reference = Repositories.Resolve(repo);
+        if (reference.Host == "nexusmods.com") { await Nexus.Verify(reference); return; }
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var response = await Get(reference, reference.ApiUrl, timeout.Token);
         if (response.StatusCode == HttpStatusCode.NotFound) throw new InvalidOperationException($"{reference.Name} project not found. Check the link and public access.");
         response.EnsureSuccessStatusCode();
     }
-    public async Task<Release> Latest(string repo, bool includePrereleases = false)
+    public async Task<Release> Latest(string repo, bool includePrereleases = false, long nexusFileId = 0)
     {
         var reference = Repositories.Resolve(repo);
+        if (reference.Host == "nexusmods.com") return await Nexus.Latest(reference, nexusFileId);
         if (reference.Host == "gitlab.com") return await LatestGitLab(reference, includePrereleases);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var endpoint = includePrereleases ? reference.Host == "codeberg.org" ? "/releases?limit=100" : "/releases?per_page=100" : "/releases/latest";
@@ -126,7 +130,8 @@ public sealed class ReleaseClient : IDisposable
 
     public async Task Download(Asset asset, string destination, IProgress<double> progress, CancellationToken cancellation)
     {
-        if (!Uri.TryCreate(asset.Url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0 || !uri.IsDefaultPort || (asset.OriginHost ?? "github.com") is not ("github.com" or "codeberg.org" or "gitlab.com") || (asset.OriginHost == null && uri.Host != "github.com")) throw new InvalidOperationException("Unexpected release download URL.");
+        var downloadUrl = asset.OriginHost == "nexusmods.com" ? await Nexus.DownloadUrl(asset, cancellation) : asset.Url;
+        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0 || !uri.IsDefaultPort || (asset.OriginHost ?? "github.com") is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com") || (asset.OriginHost == null && uri.Host != "github.com")) throw new InvalidOperationException("Unexpected release download URL.");
         var partial = destination + "." + Guid.NewGuid().ToString("N") + ".partial";
         try
         {
@@ -157,5 +162,5 @@ public sealed class ReleaseClient : IDisposable
         }
         finally { if (File.Exists(partial)) File.Delete(partial); }
     }
-    public void Dispose() => client.Dispose();
+    public void Dispose() { client.Dispose(); Nexus.Dispose(); }
 }

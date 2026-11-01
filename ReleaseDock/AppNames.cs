@@ -6,6 +6,7 @@ public static class AppNames
 {
     public static string Suggest(TrackedApp app)
     {
+        if (app.Release?.Title.Length > 0 && app.Repo.Length > 0 && Repositories.Resolve(app.Repo).Host == "nexusmods.com") return app.Release.Title;
         var draft = AppLocationDraft.From(app);
         var path = draft.FileName.Length > 0 ? Path.Combine(draft.Folder.Trim().Trim('"'), draft.FileName) : draft.Folder.Trim().Trim('"');
         try

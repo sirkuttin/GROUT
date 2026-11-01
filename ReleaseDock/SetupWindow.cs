@@ -15,6 +15,7 @@ public sealed class SetupWindow : Window
     private readonly UpdatePrompts? updatePrompts;
     private readonly Func<string, string>? newWork;
     private readonly InstallDiscovery installDiscovery;
+    private PreparedZip? preparedZip;
     private bool installerCompletion;
     private bool working;
     private bool newInstall;
@@ -27,6 +28,7 @@ public sealed class SetupWindow : Window
     private bool lookedUpChannel;
     private readonly System.Windows.Threading.DispatcherTimer lookupTimer = new() { Interval = TimeSpan.FromMilliseconds(700) };
     private Button? nextButton;
+    private Button? nexusConnect;
     private TextBlock projectInfo = Ui.Text("");
     private StackPanel destinationPanel = new();
     private readonly TextBox repo = Ui.Input();
@@ -57,9 +59,9 @@ public sealed class SetupWindow : Window
             if (working && !firstScreen) { e.Cancel = true; message.Text = "Wait for the current operation to finish. Your setup will stay here."; }
             else if (!completed && installAttempted && !(updatePrompts ?? new()).LeaveSetup(this)) e.Cancel = true;
         };
-        Closed += (_, _) => { closed = true; lookupTimer.Stop(); };
+        Closed += (_, _) => { closed = true; lookupTimer.Stop(); preparedZip?.Dispose(); };
         lookupTimer.Tick += async (_, _) => { lookupTimer.Stop(); if (firstScreen && !working && !closed) await Lookup(); };
-        repo.TextChanged += (_, _) => { if (firstScreen) { lookupTimer.Stop(); lookupTimer.Start(); } };
+        repo.TextChanged += (_, _) => { if (firstScreen) { if (nexusConnect != null) nexusConnect.Visibility = NexusMods.Enabled && repo.Text.IndexOf("nexusmods.com", StringComparison.OrdinalIgnoreCase) >= 0 ? Visibility.Visible : Visibility.Collapsed; lookupTimer.Stop(); lookupTimer.Start(); } };
         previews.Click += (_, _) => { if (firstScreen) { lookupTimer.Stop(); lookupTimer.Start(); } };
         if (edit != null)
         {
@@ -80,7 +82,7 @@ public sealed class SetupWindow : Window
         BeginPage();
         body.Children.Add(Ui.Text("ADD APP · 1 OF 2", 12, true));
         body.Children.Add(Ui.Text("Find your app", 28));
-        body.Children.Add(Ui.Text("Paste a GitHub, Codeberg or GitLab.com project or release link.", muted: true));
+        body.Children.Add(Ui.Text(NexusMods.Enabled ? "Paste a GitHub, Codeberg, GitLab.com or Nexus Mods link." : "Paste a GitHub, Codeberg or GitLab.com project or release link.", muted: true));
         repo.Text = Result.Repo; previews.IsChecked = Result.IncludePrereleases;
         body.Children.Add(Ui.Text("Project link")); body.Children.Add(repo); body.Children.Add(previews);
         projectInfo = Ui.Text("The project and latest release will appear here.", muted: true); body.Children.Add(projectInfo);
@@ -88,6 +90,8 @@ public sealed class SetupWindow : Window
         installed.IsChecked = !newInstall; fresh.IsChecked = newInstall;
         body.Children.Add(installed); body.Children.Add(fresh);
         message = Ui.Text("Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.", muted: true); body.Children.Add(message);
+        nexusConnect = Ui.Button("Connect Nexus Mods…", (_, _) => { NexusSettings.Show(this); lookedUpRepo = verifiedRepo = ""; lookupTimer.Stop(); lookupTimer.Start(); });
+        nexusConnect.Visibility = NexusMods.Enabled && repo.Text.IndexOf("nexusmods.com", StringComparison.OrdinalIgnoreCase) >= 0 ? Visibility.Visible : Visibility.Collapsed; body.Children.Add(nexusConnect);
         var row = new WrapPanel();
         row.Children.Add(Ui.Button("Cancel", (_, _) => Close()));
         nextButton = Ui.Button("Next →", async (_, _) =>
@@ -120,6 +124,10 @@ public sealed class SetupWindow : Window
         try
         {
             var parsed = Repositories.Parse(input);
+            var nexusSource = Repositories.Resolve(parsed).Host == "nexusmods.com";
+            if (nexusSource && !NexusMods.Enabled) throw new InvalidOperationException("Nexus Mods support is not available in this release yet.");
+            previews.Visibility = nexusSource ? Visibility.Collapsed : Visibility.Visible;
+            message.Text = nexusSource ? "Nexus uses the file you choose rather than a release channel. Connect your account to check versions. ZIP extraction is supported; mod dependencies and FOMOD installers are not." : "Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.";
             if (existing.Contains(parsed)) { projectInfo.Text = "Already in your library. Choose Open app."; nextButton!.Content = "Open app"; return; }
             nextButton!.Content = "Next →";
             projectInfo.Text = "Finding app…";
@@ -152,7 +160,7 @@ public sealed class SetupWindow : Window
         body.Children.Add(Ui.Text(editing ? "APP SETTINGS" : "ADD APP · 2 OF 2", 12, true));
         body.Children.Add(Ui.Text(Result.ProjectLabel, 26));
         body.Children.Add(Ui.Text("Latest release: " + (Result.Latest.Length > 0 ? Result.Latest : "unavailable"), muted: true));
-        var editor = new AppSettingsPage(this, Result, allowRepositoryEdit: editing); body.Children.Add(editor.Panel);
+        var editor = new AppSettingsPage(this, Result, allowRepositoryEdit: editing, client: github); body.Children.Add(editor.Panel);
         message = Ui.Text("", muted: true);
         var row = new WrapPanel();
         row.Children.Add(Ui.Button(editing ? "Cancel" : "← Back", (_, _) =>
@@ -202,7 +210,7 @@ public sealed class SetupWindow : Window
         var files = AssetCompatibility.Candidates(Result.Release?.Assets ?? [], Result.ShowAllDownloads);
         assets = new ComboBox { Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 16) };
         System.Windows.Automation.AutomationProperties.SetName(assets, "Release download");
-        foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = $"{asset.Name} · {ReleaseFiles.SizeText(asset)}", Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
+        foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = ReleaseFiles.FileLabel(asset), Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
         var matched = ReleaseFiles.Match(Result);
         assets.SelectedIndex = matched != null ? files.IndexOf(matched) : files.Count == 1 ? 0 : -1;
         body.Children.Add(assets);
@@ -223,6 +231,7 @@ public sealed class SetupWindow : Window
         string chosenFilename = Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(Result.UpdateTarget) : "";
         void Configure()
         {
+            finish.Tag = null;
             configuration.Children.Clear(); message.Text = "";
             if ((assets.SelectedItem as ComboBoxItem)?.Tag is not Asset asset)
             {
@@ -234,7 +243,14 @@ public sealed class SetupWindow : Window
                 }
                 return;
             }
-            Result.AssetName = asset.Name;
+            ReleaseFiles.Select(Result, asset);
+            if (asset.OriginHost == "nexusmods.com" && !github.Nexus.CanDownload)
+            {
+                finish.Content = "Open Nexus download"; finish.IsEnabled = !working;
+                configuration.Children.Add(Ui.Text("Your account can track versions. Direct installation requires Nexus Premium. Download and install this file in your browser, then go Back and choose Track an app already installed.", muted: true));
+                finish.Tag = asset; return;
+            }
+            finish.Tag = null;
             var ext = Path.GetExtension(asset.Name).ToLowerInvariant();
             var keys = ext == ".exe" ? new[] { "", "ReplaceExe", "Installer" } : ext == ".zip" ? new[] { "Zip" } : ext == ".msi" ? new[] { "Installer" } : new[] { "Manual" };
             var labels = ext == ".exe" ? new[] { "Choose how to use this EXE…", "Save as a portable app", "Run as an installer" } : ext == ".zip" ? new[] { "Extract into a folder" } : ext == ".msi" ? new[] { "Run the installer" } : new[] { "Download for manual installation" };
@@ -254,6 +270,17 @@ public sealed class SetupWindow : Window
                     if (selectedMethod == "ReplaceExe")
                     {
                         destination.Children.Add(Ui.Text("Filename", muted: true)); filename = Ui.Input(chosenFilename.Length > 0 ? chosenFilename : asset.Name); System.Windows.Automation.AutomationProperties.SetName(filename, "Filename"); destination.Children.Add(filename);
+                    }
+                    if (selectedMethod == "Zip")
+                    {
+                        var selection = Ui.Text(ZipContentPicker.Label(Result), muted: true); destination.Children.Add(selection);
+                        destination.Children.Add(Ui.Button("Choose ZIP contents…", (_, _) =>
+                        {
+                            preparedZip?.Dispose(); preparedZip = null;
+                            preparedZip = ZipContentPicker.Show(this, Result, asset, github);
+                            selection.Text = ZipContentPicker.Label(Result);
+                        }));
+                        destination.Children.Add(Ui.Button("Use entire ZIP", (_, _) => { Result.ZipSubfolder = ""; Result.ZipSourceIsFile = false; selection.Text = ZipContentPicker.Label(Result); }));
                     }
                     var path = Ui.Text("", muted: true); destination.Children.Add(path);
                     void Validate()
@@ -288,19 +315,26 @@ public sealed class SetupWindow : Window
             Result.ShowAllDownloads = allDownloads.IsChecked == true;
             files = AssetCompatibility.Candidates(Result.Release?.Assets ?? [], Result.ShowAllDownloads);
             assets.Items.Clear();
-            foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = $"{asset.Name} · {ReleaseFiles.SizeText(asset)}", Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
+            foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = ReleaseFiles.FileLabel(asset), Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
             assets.SelectedIndex = chosen != null && files.Contains(chosen) ? files.IndexOf(chosen) : files.Count == 1 ? 0 : -1;
             Configure();
         };
         finish.Click += async (_, _) =>
         {
-            if (working || selectedMethod.Length == 0 || (assets.SelectedItem as ComboBoxItem)?.Tag is not Asset asset) return;
+            if (working) return;
+            if (finish.Tag is Asset browserAsset)
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(NexusMods.FilePage(Result.Repo, browserAsset)) { UseShellExecute = true }); }
+                catch (Exception ex) { message.Text = ex.Message; }
+                return;
+            }
+            if (selectedMethod.Length == 0 || (assets.SelectedItem as ComboBoxItem)?.Tag is not Asset asset) return;
             working = true; finish.IsEnabled = false; back.IsEnabled = false; assets.IsEnabled = false; configuration.IsEnabled = false;
             operation = new(); cancel.Visibility = Visibility.Visible;
             try
             {
-                Result.UpdateMethod = selectedMethod; Result.AssetName = asset.Name;
-                var outcome = await UpdateRunner.Run(this, Result, asset, github, (text, progress) => { message.Text = text + (progress < 100 ? $" {progress:F0}%" : ""); cancel.IsEnabled = text.StartsWith("Downloading") || text.StartsWith("Inspecting ZIP"); }, () => { }, operation.Token, newInstall: true, prompts: updatePrompts, newWork: newWork, discovery: installDiscovery);
+                Result.UpdateMethod = selectedMethod; ReleaseFiles.Select(Result, asset);
+                var outcome = await UpdateRunner.Run(this, Result, asset, github, (text, progress) => { message.Text = text + (progress < 100 ? $" {progress:F0}%" : ""); cancel.IsEnabled = text.StartsWith("Downloading") || text.StartsWith("Inspecting ZIP"); }, () => { }, operation.Token, newInstall: true, prompts: updatePrompts, newWork: newWork, discovery: installDiscovery, preparedZip: preparedZip);
                 installAttempted = Result.DownloadedPath.Length > 0;
                 if (outcome == UpdateOutcome.Deferred) { message.Text = "Nothing was installed or added. Your download is ready; you can retry."; return; }
                 if (outcome == UpdateOutcome.FilesApplied)

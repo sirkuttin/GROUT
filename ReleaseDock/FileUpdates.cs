@@ -109,6 +109,34 @@ public static class FileUpdates
         }
         return staging;
     }
+    public static string NormalizeZipSubfolder(string value)
+    {
+        value = value.Trim();
+        if (value.Length == 0) return "";
+        return SafeRelative(value.Replace('\\', '/').TrimEnd('/')).Replace('\\', '/');
+    }
+    public static string ZipSource(string staging, string subfolder)
+    {
+        var relative = NormalizeZipSubfolder(subfolder);
+        if (relative.Length == 0) return staging;
+        var source = Path.Combine(Path.GetFullPath(staging), relative.Replace('/', Path.DirectorySeparatorChar));
+        NoLinks(source);
+        if (!Directory.Exists(source)) throw new IOException("Folder '" + relative + "' was not found inside the ZIP. Check the Folder inside ZIP setting.");
+        if (!Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories).Any()) throw new IOException("Folder '" + relative + "' inside the ZIP contains no files. Nothing was installed.");
+        return source;
+    }
+    public static List<UpdateFile> PlanZip(string staging, string destination, string selection, bool isFile)
+    {
+        if (!isFile) return Plan(ZipSource(staging, selection), destination, false);
+        var relative = NormalizeZipSubfolder(selection);
+        if (relative.Length == 0) throw new IOException("Choose a file inside the ZIP.");
+        var source = Path.Combine(Path.GetFullPath(staging), relative.Replace('/', Path.DirectorySeparatorChar));
+        NoLinks(source);
+        if (!File.Exists(source)) throw new IOException("File '" + relative + "' was not found inside the ZIP. Choose ZIP contents again.");
+        var name = Path.GetFileName(source);
+        var target = Path.Combine(Path.GetFullPath(destination), name); NoLinks(target);
+        return [new UpdateFile { Source = source, Target = target, Relative = name, Existed = File.Exists(target) }];
+    }
     public static List<UpdateFile> Plan(string sourceRoot, string destination, bool removeOuterFolder)
     {
         destination = Path.GetFullPath(destination);

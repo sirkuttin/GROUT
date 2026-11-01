@@ -20,6 +20,7 @@ public static class SettingsWindow
             licenses.Content = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(20) };
             licenses.ShowDialog();
         }));
+        if (NexusMods.Enabled) panel.Children.Add(Ui.Button("Nexus Mods connection…", (_, _) => NexusSettings.Show(window)));
         panel.Children.Add(Ui.Text("Check for app updates"));
         var hours = new[] { 0, 1, 6, 24 };
         var frequency = Ui.Choice(["Manual only", "Every hour", "Every 6 hours", "Every day"], Array.IndexOf(hours, preferences.CheckHours)); panel.Children.Add(frequency);

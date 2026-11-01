@@ -152,3 +152,17 @@ The selected app shows its full repository URL beneath its name; click it to ope
 Suggested app names remain automatic and refresh when the install location changes. Typing a custom name makes it an explicit override. **Use detected name** clears the override and returns to the current app's name. A shared parent folder is not used to borrow an unrelated program's identity. Overrides saved by older versions are preserved until you reset them, so intentional custom names are not lost.
 
 App counts and update counts appear below **Check now**; during a check they temporarily show **Checking for updates…**. A failed check is marked in amber on the affected app entry. **Open app folder** is disabled for a missing installation. **Show downloaded file** is only available for **Download only** mode, where you install the downloaded file yourself.
+
+## Nexus Mods (private test builds only)
+
+Nexus is disabled in public releases. In an explicitly enabled private test build, use **Settings → Nexus Mods connection…** or **Connect Nexus Mods…** in Add App. See the [Nexus setup guide](nexus-mods.md) for account setup, file selection and Premium/free behavior. Nexus keys are stored in `nexus-connection.bin`, encrypted for your Windows account, separately from `apps.json` and `settings.json`. Disconnect removes that connection file.
+
+## Install part of a ZIP
+
+For ZIP installs, choose **Choose ZIP contents…** after selecting the download. GROUT downloads and inspects the ZIP, then displays its folders and files. Choose **Entire ZIP**, a folder, or a single file and confirm the selection.
+
+A selected folder installs its contents directly into the app folder; its enclosing folders are not copied. A selected file is copied into the app folder using its filename. No files are installed while browsing. Cancel preserves the previous choice.
+
+The choice is saved for future updates. Change it under **App settings → ZIP contents**. **Use entire ZIP** resets it. If a future archive no longer contains the saved item, GROUT stops before changing installed files and asks you to select it again. File overwrites remain automatic; this is not a conflict-review step.
+
+![ZIP folder selection using sample data](images/zip-selection.png)

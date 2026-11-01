@@ -134,7 +134,7 @@ try
     var build = Path.Combine(root.FullName, "work", "release-" + version + "-" + Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(build);
     Console.WriteLine("Building " + tag + " as a single EXE…");
-    Console.WriteLine(await Run("dotnet", "build", project, "-c", "Release", "-p:PublishProfile=Portable-win-x64", "-o", build, "--source", "https://api.nuget.org/v3/index.json"));
+    Console.WriteLine(await Run("dotnet", "build", project, "-c", "Release", "-p:PublishProfile=Portable-win-x64", "-p:NexusTestingEnabled=false", "-o", build, "--source", "https://api.nuget.org/v3/index.json"));
     var exe = Path.Combine(build, "GROUT.exe");
     if (!File.Exists(exe) || Directory.GetFiles(build).Length != 1 || Directory.GetDirectories(build).Length != 0) throw new Exception("Build must contain exactly GROUT.exe, without runtime DLLs or a config file.");
     if (new FileInfo(exe).Length >= 1_000_000) throw new Exception("GROUT.exe exceeds the under-1-MB size budget.");

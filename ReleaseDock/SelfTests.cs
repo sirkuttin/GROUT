@@ -15,12 +15,20 @@ internal static class SelfTests
     private static void Check(bool condition, string reason) { if (!condition) throw new Exception(reason); }
     public static async Task Run()
     {
+        NexusMods.TestMode = true;
+        try { await RunAll(); }
+        finally { NexusMods.TestMode = false; }
+    }
+    private static async Task RunAll()
+    {
+        await NexusTests.Run();
         FrameworkTests.Run();
         AssetCompatibilityTests.Run();
         AppIdentityTests.Run();
         StorageCleanupTests.Run();
         MissingInstallationTests.Run();
         await ZipFolderTests.Run();
+        await ZipSelectionTests.Run();
         await SelfUpdateTests.Run();
         await FeatureTests.Run();
         await WizardTests.Run();

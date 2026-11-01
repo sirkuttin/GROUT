@@ -11,6 +11,8 @@ public sealed class AppSettingsPage
     private readonly TrackedApp app;
     private readonly AppLocationDraft draft;
     private readonly TextBox folder, file, manual, appName;
+    private readonly TextBlock zipSelection;
+    private readonly StackPanel zipPanel;
     private readonly CheckBox automatic, previews;
     private readonly ComboBox method, assets;
     private readonly TextBlock detected, sourceLabel, action;
@@ -22,7 +24,7 @@ public sealed class AppSettingsPage
     public string RepositoryKey => repository == null ? app.Repo : Repositories.Parse(repository.Text);
     public StackPanel Panel { get; } = new();
     private static void Name(DependencyObject control, string label) => System.Windows.Automation.AutomationProperties.SetName(control, label);
-    public AppSettingsPage(Window owner, TrackedApp app, bool allowRepositoryEdit = false)
+    public AppSettingsPage(Window owner, TrackedApp app, bool allowRepositoryEdit = false, ReleaseClient? client = null)
     {
         this.owner = owner; this.app = app; draft = AppLocationDraft.From(app);
         if (allowRepositoryEdit)
@@ -51,16 +53,26 @@ public sealed class AppSettingsPage
         filePanel = new StackPanel { Margin = new Thickness(0, 14, 0, 0) }; filePanel.Children.Add(Ui.Text("App file", 18));
         file = Ui.Input(draft.FileName); Name(file, "App file"); filePanel.Children.Add(file); Panel.Children.Add(filePanel);
         Panel.Children.Add(Ui.Text("Updates", 18)); method = Ui.Choice(Methods.Select(ReleaseFiles.Label), Math.Max(0, Array.IndexOf(Methods, app.UpdateMethod))); Name(method, "Update method"); Panel.Children.Add(method);
+        zipPanel = new StackPanel(); zipPanel.Children.Add(Ui.Text("ZIP contents", 18));
+        zipSelection = Ui.Text(ZipContentPicker.Label(app), muted: true); zipPanel.Children.Add(zipSelection);
+        var chooseContents = Ui.Button("Choose ZIP contents…", (_, _) =>
+        {
+            if (client == null || (assets!.SelectedItem as ComboBoxItem)?.Tag is not Asset selected) return;
+            using var prepared = ZipContentPicker.Show(owner, app, selected, client);
+            zipSelection.Text = ZipContentPicker.Label(app);
+        }); chooseContents.IsEnabled = client != null; zipPanel.Children.Add(chooseContents);
+        zipPanel.Children.Add(Ui.Button("Use entire ZIP", (_, _) => { app.ZipSubfolder = ""; app.ZipSourceIsFile = false; zipSelection.Text = ZipContentPicker.Label(app); }));
+        zipPanel.Children.Add(Ui.Text("Choose the whole archive, a folder’s contents or one file. Future updates use that same selection.", muted: true)); Panel.Children.Add(zipPanel);
         Panel.Children.Add(Ui.Text("Release download", 18)); assets = new ComboBox { Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 14) }; Name(assets, "Release download");
         var files = AssetCompatibility.Candidates(app.Release?.Assets ?? [], app.ShowAllDownloads);
-        foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = $"{asset.Name} · {ReleaseFiles.SizeText(asset)}", Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
+        foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = ReleaseFiles.FileLabel(asset), Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
         var match = ReleaseFiles.Match(app); assets.SelectedIndex = match != null ? files.IndexOf(match) : files.Count == 1 ? 0 : -1; Panel.Children.Add(assets);
         var allDownloads = Ui.Check("Show all downloads (including other operating systems)", app.ShowAllDownloads); Panel.Children.Add(allDownloads);
         allDownloads.Click += (_, _) =>
         {
             var selected = (assets.SelectedItem as ComboBoxItem)?.Tag as Asset; app.ShowAllDownloads = allDownloads.IsChecked == true;
             files = AssetCompatibility.Candidates(app.Release?.Assets ?? [], app.ShowAllDownloads); assets.Items.Clear();
-            foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = $"{asset.Name} · {ReleaseFiles.SizeText(asset)}", Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
+            foreach (var asset in files) assets.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = ReleaseFiles.FileLabel(asset), Foreground = System.Windows.Media.Brushes.Black }, Tag = asset });
             assets.SelectedIndex = selected != null && files.Contains(selected) ? files.IndexOf(selected) : files.Count == 1 ? 0 : -1;
         };
         action = Ui.Text("", muted: true); Panel.Children.Add(action);
@@ -75,6 +87,7 @@ public sealed class AppSettingsPage
         advanced.Children.Add(Ui.Button("Choose version file…", (_, _) => { var picker = new OpenFileDialog { Title = "Choose a version source", Filter = "Version sources|*.exe;*.json" }; if (picker.ShowDialog(owner) == true) { draft.SourceOverride = string.Equals(Framework.GetDirectoryName(picker.FileName), folder.Text, StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(picker.FileName) : picker.FileName; automatic.IsChecked = true; CheckVersion(); } }));
         advanced.Children.Add(Ui.Button("Use app location for version", (_, _) => { draft.SourceOverride = ""; CheckVersion(); }));
         previews = Ui.Check("Include preview releases", app.IncludePrereleases); advanced.Children.Add(previews);
+        if (app.Repo.Length > 0 && Repositories.Resolve(app.Repo).Host == "nexusmods.com") previews.Visibility = Visibility.Collapsed;
         advancedSection = new Expander { Header = "Advanced settings", Foreground = System.Windows.Media.Brushes.White, Content = advanced, Margin = new Thickness(0, 14, 0, 0) }; Panel.Children.Add(advancedSection);
         folder.TextChanged += (_, _) => Refresh(); file.TextChanged += (_, _) => Refresh(); method.SelectionChanged += (_, _) => Refresh(); automatic.Click += (_, _) => CheckVersion();
         Refresh(); if (app.AutoReconcile) CheckVersion();
@@ -83,6 +96,7 @@ public sealed class AppSettingsPage
     private void ReadLocation() { draft.Folder = folder.Text.Trim(); draft.FileName = file.Text.Trim(); }
     private void Refresh()
     {
+        zipPanel.Visibility = Method == "Zip" ? Visibility.Visible : Visibility.Collapsed;
         ReadLocation(); filePanel.Visibility = Method == "ReplaceExe" || draft.FileName.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (!customName)
         {
@@ -121,21 +135,23 @@ public sealed class AppSettingsPage
         if (!customName) app.InvalidateSuggestedName();
         if (!validate) { CaptureDraft(); return; }
         ReadLocation(); draft.Apply(app, Method);
+        if (Method == "Zip") app.ZipSubfolder = FileUpdates.NormalizeZipSubfolder(app.ZipSubfolder);
         app.AutoReconcile = automatic.IsChecked == true; app.IncludePrereleases = previews.IsChecked == true;
         if (app.Installed != manual.Text.Trim()) app.InstalledProvenance = "Manually entered installed version";
         app.Installed = manual.Text.Trim();
-        if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) { app.AssetName = asset.Name; if (validate && !sourceChanged) ReleaseFiles.Validate(app, asset); }
+        if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) { ReleaseFiles.Select(app, asset); if (validate && !sourceChanged) ReleaseFiles.Validate(app, asset); }
         else if (validate && !sourceChanged && Method != "Manual") throw new InvalidOperationException("Choose a release download or use Download only.");
         InstalledVersions.Reconcile(app);
         if (sourceChanged)
         {
             app.Repo = source; app.Release = null; app.Latest = ""; app.CheckedAt = null; app.Error = "";
-            app.AssetName = ""; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
+            app.AssetName = ""; app.NexusFileId = 0; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
             app.UpdateState = "Repository changed — checking the new source";
         }
     }
     public void CaptureDraft()
     {
+
         app.CustomName = customName ? appName.Text.Trim() : "";
         if (!customName) app.InvalidateSuggestedName();
         ReadLocation(); app.AppFolder = draft.Folder; app.AppFile = draft.FileName; app.VersionSourceOverride = draft.SourceOverride;
@@ -147,6 +163,6 @@ public sealed class AppSettingsPage
             app.InstallLocation = draft.SourceOverride.Length > 0 ? Framework.IsPathFullyQualified(draft.SourceOverride) ? draft.SourceOverride : draft.Folder + Path.DirectorySeparatorChar + draft.SourceOverride : draft.FileName.Length > 0 ? draft.Folder + Path.DirectorySeparatorChar + draft.FileName : draft.Folder;
             app.UpdateTarget = Method == "ReplaceExe" ? draft.Folder + Path.DirectorySeparatorChar + draft.FileName : Method == "Zip" ? draft.Folder : "";
         }
-        if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) app.AssetName = asset.Name;
+        if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) ReleaseFiles.Select(app, asset);
     }
 }

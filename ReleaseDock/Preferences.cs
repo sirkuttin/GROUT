@@ -57,6 +57,8 @@ public sealed class Preferences
 
 public static class ReleaseFiles
 {
+    public static string FileLabel(Asset asset) => asset.Name + (asset.FileId > 0 ? " · v" + asset.Version : "") + " · " + SizeText(asset);
+    public static void Select(TrackedApp app, Asset asset) { app.AssetName = asset.Name; app.NexusFileId = asset.FileId; if (asset.FileId > 0) { app.Latest = asset.Version; if (app.Release != null) app.Release = app.Release with { Tag = asset.Version, SelectedFileId = asset.FileId }; } }
     public static string SizeText(Asset asset) => asset.Size >= 0 ? $"{asset.Size / 1048576d:F1} MB" : "size unknown";
     public static bool TakeNotification(TrackedApp app, bool quiet)
     {
@@ -68,6 +70,7 @@ public static class ReleaseFiles
     public static Asset? Match(TrackedApp app)
     {
         var files = AssetCompatibility.Candidates(app.Release?.Assets ?? [], app.ShowAllDownloads);
+        if (app.Repo.Length > 0 && Repositories.Resolve(app.Repo).Host == "nexusmods.com") return files.FirstOrDefault(a => a.FileId == (app.Release?.SelectedFileId > 0 ? app.Release.SelectedFileId : app.NexusFileId) && a.FileId > 0);
         var exact = files.FirstOrDefault(a => a.Name == app.AssetName);
         if (exact != null) return exact;
         var family = files.Where(a => Family(a.Name) == Family(app.AssetName)).ToList();
@@ -81,6 +84,7 @@ public static class ReleaseFiles
         if (app.UpdateMethod == "Installer" && ext is not (".exe" or ".msi")) throw new InvalidOperationException("Installer mode needs an EXE or MSI release file.");
         if (app.UpdateMethod == "ReplaceExe" && (ext != ".exe" || !app.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("Replacement needs an EXE download and an exact EXE destination.");
         if (app.UpdateMethod == "Zip" && ext != ".zip") throw new InvalidOperationException("Extraction needs a ZIP release file.");
+        if (app.UpdateMethod == "Zip") FileUpdates.NormalizeZipSubfolder(app.ZipSubfolder);
         if (app.UpdateMethod is "Zip" or "ReplaceExe")
         {
             if (!Framework.IsPathFullyQualified(app.UpdateTarget)) throw new InvalidOperationException("Choose an absolute update destination.");

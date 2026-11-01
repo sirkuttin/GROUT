@@ -17,18 +17,19 @@ public sealed class UpdatePrompts
 
 public static class UpdateRunner
 {
-    public static async Task<UpdateOutcome> Run(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel = default, bool newInstall = false, UpdatePrompts? prompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null)
+    public static async Task<UpdateOutcome> Run(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel = default, bool newInstall = false, UpdatePrompts? prompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null, PreparedZip? preparedZip = null)
     {
         var allocate = newWork ?? AppPaths.NewWork;
         var allocated = new List<(string Category, string Folder)>();
         UpdateOutcome? outcome = null;
         try
         {
-            outcome = await RunCore(owner, app, asset, github, status, persist, cancel, newInstall, prompts, category => { var folder = allocate(category); allocated.Add((category, folder)); return folder; }, discovery);
+            outcome = await RunCore(owner, app, asset, github, status, persist, cancel, newInstall, prompts, category => { var folder = allocate(category); allocated.Add((category, folder)); return folder; }, discovery, preparedZip);
             return outcome.Value;
         }
         finally
         {
+            preparedZip?.Dispose();
             foreach (var item in allocated)
                 if (item.Category == "staging" || item.Category == "backups" && StorageCleanup.SafeBackup(item.Folder) || item.Category == "downloads" && (outcome == UpdateOutcome.FilesApplied || outcome == UpdateOutcome.InstallerReturned && app.IsCurrent))
                     StorageCleanup.DeleteFolder(item.Folder, Framework.GetDirectoryName(item.Folder)!);
@@ -37,7 +38,7 @@ public static class UpdateRunner
             persist();
         }
     }
-    private static async Task<UpdateOutcome> RunCore(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel, bool newInstall, UpdatePrompts? prompts, Func<string, string>? newWork, InstallDiscovery? discovery)
+    private static async Task<UpdateOutcome> RunCore(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel, bool newInstall, UpdatePrompts? prompts, Func<string, string>? newWork, InstallDiscovery? discovery, PreparedZip? preparedZip)
     {
         prompts ??= new(); newWork ??= AppPaths.NewWork;
         ReleaseFiles.Validate(app, asset);
@@ -48,8 +49,9 @@ public static class UpdateRunner
             var hash = Framework.Hex(await Framework.HashAsync(cached, cancel));
             reusable = hash.Equals(asset.Digest[7..], StringComparison.OrdinalIgnoreCase);
         }
-        var path = reusable ? app.DownloadedPath : Path.Combine(newWork("downloads"), Path.GetFileName(asset.Name));
-        if (!reusable)
+        var preparedPath = preparedZip?.VerifiedPath(app, asset);
+        var path = preparedPath ?? (reusable ? app.DownloadedPath : Path.Combine(newWork("downloads"), Path.GetFileName(asset.Name)));
+        if (!reusable && preparedPath == null)
         {
             status("Downloading " + asset.Name + "…", 0);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancel);
@@ -104,7 +106,7 @@ public static class UpdateRunner
             status("Inspecting ZIP contents…", 100);
             var staging = await Task.Run(() => FileUpdates.StageZip(path, newWork("staging"), cancel));
             cancel.ThrowIfCancellationRequested();
-            var plan = FileUpdates.Plan(staging, app.UpdateTarget, false);
+            var plan = FileUpdates.PlanZip(staging, app.UpdateTarget, app.ZipSubfolder, app.ZipSourceIsFile);
             foreach (var file in plan) file.Apply = true;
             status("Extracting ZIP…", 100);
             app.LastBackup = newWork("backups"); persist();

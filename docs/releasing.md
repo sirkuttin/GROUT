@@ -78,3 +78,5 @@ git push
 This does not create a release. Use `--publish` only when you intend to release a new version.
 
 Releases use the stable download filename GROUT.exe. Both EXE asset names share the same SHA-256; the compatibility asset lets 0.5.0 self-updaters reach newer releases. The script also validates that existing local/remote tags and the published tag resolve to the tested commit. Successful publication removes the redundant local compatibility EXE; GitHub retains it.
+
+Public builds currently disable Nexus Mods pending application registration. The release script explicitly sets NexusTestingEnabled=false; private test builds are separate and must not be published as public releases.

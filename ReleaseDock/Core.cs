@@ -14,17 +14,20 @@ public sealed class TrackedApp
     public string CustomName { get; set; } = "";
     private string nameKey = "", suggestedName = "";
     internal void InvalidateSuggestedName() => nameKey = "";
-    [JsonIgnore] public string AppName { get { if (!string.IsNullOrWhiteSpace(CustomName)) return CustomName.Trim(); var key = Repo + "|" + AppFolder + "|" + AppFile + "|" + InstallLocation + "|" + UpdateTarget + "|" + AssetName; if (key != nameKey) { nameKey = key; suggestedName = AppNames.Suggest(this); } return suggestedName; } }
+    [JsonIgnore] public string AppName { get { if (!string.IsNullOrWhiteSpace(CustomName)) return CustomName.Trim(); var key = Repo + "|" + AppFolder + "|" + AppFile + "|" + InstallLocation + "|" + UpdateTarget + "|" + AssetName + "|" + (Release?.Title ?? ""); if (key != nameKey) { nameKey = key; suggestedName = AppNames.Suggest(this); } return suggestedName; } }
     [JsonIgnore] public string ProjectLabel { get { if (Repo.Length == 0) return ""; var source = Repositories.Resolve(Repo); return source.Path + (source.Host == "github.com" ? "" : " · " + source.Name); } }
     public string Installed { get; set; } = "";
     public string Latest { get; set; } = "";
     public string AssetName { get; set; } = "";
+    public long NexusFileId { get; set; }
     public bool IncludePrereleases { get; set; }
     public bool ShowAllDownloads { get; set; }
     public string InstallLocation { get; set; } = "";
     public bool AutoReconcile { get; set; }
     public string UpdateMethod { get; set; } = "Manual";
     public string UpdateTarget { get; set; } = "";
+    public string ZipSubfolder { get; set; } = "";
+    public bool ZipSourceIsFile { get; set; }
     public string LastNotifiedTag { get; set; } = "";
     public string LastBackup { get; set; } = "";
     public string UpdateState { get; set; } = "";
@@ -58,8 +61,8 @@ public sealed class TrackedApp
     [JsonIgnore] public string Versions => $"{(InstallationMissing ? "Last known version" : "Installed")}: {(Installed.Length == 0 ? "unknown" : Installed)}    →    Latest: {(Latest.Length == 0 ? "unknown" : Latest)}";
     [JsonIgnore] public string DisplayStatus => CanUpdate && ReleaseFiles.Match(this) == null ? Release?.Assets.Any(a => Repositories.IsWindowsAsset(a.Name)) == true ? "Choose release download" : "No app downloads found" : Status;
 }
-public sealed record Asset(string Name, string Url, long Size, string? Digest, string? OriginHost = null);
-public sealed record Release(string Tag, string Url, string Notes, List<Asset> Assets);
+public sealed record Asset(string Name, string Url, long Size, string? Digest, string? OriginHost = null, long FileId = 0, string Version = "");
+public sealed record Release(string Tag, string Url, string Notes, List<Asset> Assets, long SelectedFileId = 0, string Title = "");
 
 public sealed class Store(string path)
 {

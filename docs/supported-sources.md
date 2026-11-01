@@ -18,6 +18,10 @@ https://gitlab.com/group/subgroup/app/-/releases
 
 Host identity is retained, so equal owner/project names on different hosts remain separate library entries.
 
+## Nexus Mods (disabled in public builds)
+
+Public builds keep this integration disabled pending registration. In explicitly enabled private test builds, paste a mod-page link such as `https://www.nexusmods.com/diablo2resurrected/mods/169`. Nexus requires an account/API connection. GROUT tracks the chosen file and follows the publisher's file-update chain, independently of optional files. Direct downloads require Premium; free accounts open Nexus in a browser. See the [Nexus guide](nexus-mods.md). This integration requires Nexus application registration before wider public release.
+
 ## Release selection
 
 Stable releases are the default. Enable **Include preview releases** per app when desired, including projects whose only releases are previews.
@@ -37,7 +41,7 @@ GitLab release asset links can have friendly labels; GROUT derives a filename wh
 ## Current limits
 
 - No private app repositories, self-hosted Gitea/Forgejo/GitLab servers, standalone download URLs or website scraping.
-- EXE, MSI and ZIP files have the update methods in the [user guide](user-guide.md#configure-future-updates). Formats such as MSIX and 7z require manual handling.
+- EXE, MSI and ZIP files have the update methods in the [user guide](user-guide.md#configure-future-updates). Formats such as MSIX, 7z and RAR require manual handling.
 - An EXE can be an installer or a portable app; choose its purpose yourself.
 - Source metadata redirects stay on the same API host. Download redirects reject HTTPS-to-HTTP downgrade, embedded credentials and obvious local/private literal addresses.
 - Version comparison supports common schemes, not every arbitrary publisher tag.

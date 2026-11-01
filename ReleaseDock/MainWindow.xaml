@@ -6,7 +6,7 @@
    <StackPanel><TextBlock Text="G.R.O.U.T." Foreground="#76DCC6" FontSize="12" FontWeight="SemiBold"/><TextBlock Text="Your apps, kept together." FontSize="28" FontWeight="SemiBold" Margin="0,8,0,6"/></StackPanel>
   </DockPanel>
   <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-   <ListBox x:Name="Library" Background="#101C2D" BorderThickness="0" Foreground="White" HorizontalContentAlignment="Stretch" SelectionChanged="Selected">
+   <ListBox x:Name="Library" Background="#101C2D" BorderThickness="0" Foreground="White" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Selected">
     <ListBox.ItemTemplate><DataTemplate>
      <Grid Margin="10,14">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

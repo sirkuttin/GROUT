@@ -258,3 +258,20 @@
 - Replaced modern-only APIs with Framework implementations; native modern folder picker, ZIP CRC/PE checks, atomic replacement and updater rollback retained. No external runtime DLLs.
 - Release script builds and tests a single EXE with a strict under-1,000,000-byte budget. Legacy runtime redistribution notices removed; Windows prerequisite notice included.
 - Packaged suite passed: 15 new Framework compatibility assertions plus all existing regressions. EXE measured 449,536 bytes before final documentation cleanup. Additional direct old-to-new upgrade and live-provider smoke commands were blocked by automatic approval review; not claimed as verified.
+
+## 0.7.0 Nexus Mods test integration
+- Researched D2RMM ModUpdaterAPI and Nexus official API/AUP. Added authenticated Nexus metadata/file updates, Premium direct download resolution, free-account browser fallback and local DPAPI-protected connection settings.
+- Selected file versions/update chains are tracked separately from optional uploads. Existing ZIP/EXE validation and installation pipeline reused. No SSO identity borrowed and no nxm handler ownership changed.
+- Public Nexus application registration is required before wider release. Build remains local and uses personal keys for testing only. No real account credentials or live Premium download were used in validation.
+- Footer proposal accepted: shared save failures are candidates; action/app feedback belongs with its UI. Remaining routing work is separate from this feature.
+- Packaged tests pass with 52 Nexus assertions, including a real wizard flow under simulated free-account responses and a Premium ZIP apply/cleanup pipeline. EXE stays below 500 KB. Added sample Nexus screenshot; constrained sidebar content to prevent long provider labels causing horizontal scrolling.
+
+## Visual ZIP contents selection
+- Optional whole ZIP, folder contents or single-file selection in a post-download tree picker, available in first install and App settings. Choice persists for future updates without repeated prompts.
+- First install reuses the inspected archive after hash verification and re-stages it before applying files. Preview/cancel cleanup, missing/unsafe item handling and direct overwrite behavior retained.
+- Added 30 ZIP selection assertions including actual modal confirm/cancel flows, copied-content filtering, settings overwrite, inspected archive reuse and cleanup.
+
+## 0.7.1 publication decision — 2026-11-01
+- User confirmed Nexus registration is not completed and explicitly chose to publish with Nexus disabled. Public API requests and connection UI are disabled; previously saved Nexus entries still load. Private testing requires NexusTestingEnabled=true. Release script forces false.
+- Publish the visual ZIP folder/file selector, remembered future-update mapping and ZIP/cache safety tests.
+- Public version is 0.7.1 so existing 0.7.0 private test builds can detect the release through the self-updater. Public-build suite passed all regressions including 54 Nexus gate/behavior checks and 30 ZIP selection checks.

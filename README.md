@@ -12,7 +12,9 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*Current 0.6.0 interface with sample data.*
+*Current 0.7.1 interface with sample data.*
+
+> **Nexus Mods:** integration is under development and disabled in public builds pending application registration. See the [Nexus guide](docs/nexus-mods.md).
 
 ## What it does
 

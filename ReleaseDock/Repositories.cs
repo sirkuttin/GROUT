@@ -4,24 +4,30 @@ namespace ReleaseDock;
 
 public sealed record RepositoryRef(string Host, string Path)
 {
-    public string Name => Host switch { "codeberg.org" => "Codeberg", "gitlab.com" => "GitLab", _ => "GitHub" };
+    public string Name => Host switch { "codeberg.org" => "Codeberg", "gitlab.com" => "GitLab", "nexusmods.com" => "Nexus Mods", _ => "GitHub" };
     public string WebUrl => $"https://{Host}/{Path}";
     public string Key => Host == "github.com" ? Path : WebUrl;
-    public string ReleasesUrl => WebUrl + (Host == "gitlab.com" ? "/-/releases" : "/releases");
-    public string ApiUrl => Host switch { "codeberg.org" => $"https://codeberg.org/api/v1/repos/{Path}", "gitlab.com" => "https://gitlab.com/api/v4/projects/" + Uri.EscapeDataString(Path), _ => $"https://api.github.com/repos/{Path}" };
+    public string ReleasesUrl => Host == "nexusmods.com" ? WebUrl + "?tab=files" : WebUrl + (Host == "gitlab.com" ? "/-/releases" : "/releases");
+    public string ApiUrl => Host switch { "nexusmods.com" => "https://api.nexusmods.com/v1/games/" + Path.Split('/')[0] + "/mods/" + Path.Split('/')[2], "codeberg.org" => $"https://codeberg.org/api/v1/repos/{Path}", "gitlab.com" => "https://gitlab.com/api/v4/projects/" + Uri.EscapeDataString(Path), _ => $"https://api.github.com/repos/{Path}" };
 }
 
 public static class Repositories
 {
     public static RepositoryRef Resolve(string input)
     {
-        input = input.Trim(); var host = "github.com";
+        input = input.Trim(); if (input.StartsWith("www.nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("nexusmods.com/", StringComparison.OrdinalIgnoreCase)) input = "https://" + input; var host = "github.com";
         if (!input.Contains("://") && (input.StartsWith("codeberg.org/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("gitlab.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("github.com/", StringComparison.OrdinalIgnoreCase))) input = "https://" + input;
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri))
         {
-            host = uri.Host.ToLowerInvariant();
-            if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || host is not ("github.com" or "codeberg.org" or "gitlab.com")) throw new ArgumentException("Use a public HTTPS project link from GitHub, Codeberg or GitLab.com.");
+            host = uri.Host.ToLowerInvariant(); if (host == "www.nexusmods.com") host = "nexusmods.com";
+            if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || host is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com")) throw new ArgumentException("Use an HTTPS project link from GitHub, Codeberg, GitLab.com or Nexus Mods.");
             var path = uri.AbsolutePath.Trim('/');
+            if (host == "nexusmods.com")
+            {
+                var mod = Regex.Match(path, @"^(?:games/)?([a-z0-9_-]+)/mods/([1-9][0-9]*)/?$", RegexOptions.IgnoreCase);
+                if (!mod.Success || !long.TryParse(mod.Groups[2].Value, out _)) throw new ArgumentException("Use a Nexus mod link such as https://www.nexusmods.com/game/mods/123.");
+                return new(host, mod.Groups[1].Value.ToLowerInvariant() + "/mods/" + mod.Groups[2].Value);
+            }
             if (host == "gitlab.com") { var marker = path.IndexOf("/-/", StringComparison.Ordinal); if (marker >= 0) path = path[..marker]; }
             else path = string.Join("/", path.Split('/').Take(2));
             input = path;
@@ -32,5 +38,5 @@ public static class Repositories
         return new(host, input);
     }
     public static string Parse(string input) => Resolve(input).Key;
-    public static bool IsWindowsAsset(string name) => new[] { ".exe", ".msi", ".msix", ".msixbundle", ".zip", ".7z" }.Any(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+    public static bool IsWindowsAsset(string name) => new[] { ".exe", ".msi", ".msix", ".msixbundle", ".zip", ".7z", ".rar" }.Any(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
 }

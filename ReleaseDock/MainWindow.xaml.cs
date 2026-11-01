@@ -164,7 +164,8 @@ public partial class MainWindow : Window
         InstalledInput.Text = app?.Installed ?? "";
         LocalLabel.Text = app?.LocalStatus ?? "";
         var asset = app != null ? ReleaseFiles.Match(app) : null;
-        UpdateButton.IsEnabled = !busy && app?.CanUpdate == true && asset != null;
+        UpdateButton.IsEnabled = !busy && app?.CanUpdate == true && asset != null && (asset.OriginHost != "nexusmods.com" || NexusMods.Enabled);
+        UpdateButton.Content = asset?.OriginHost == "nexusmods.com" && (preview || !github.Nexus.CanDownload) ? "Open Nexus download" : "Update";
         UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose a release download in App settings." : "Apply the configured update method.";
         MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod) + (asset == null ? " · Choose a release file in App settings" : app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
         UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.UpdateIssue }.Where(s => s.Length > 0));
@@ -193,7 +194,13 @@ public partial class MainWindow : Window
     private async Task Fetch(TrackedApp app)
     {
         InstalledVersions.Reconcile(app);
-        try { app.Release = await github.Latest(app.Repo, app.IncludePrereleases); app.Latest = app.Release.Tag; app.Error = ""; app.CheckedAt = DateTimeOffset.UtcNow; }
+        try
+        {
+            app.Release = await github.Latest(app.Repo, app.IncludePrereleases, app.NexusFileId); app.Latest = app.Release.Tag;
+            if (app.Release.SelectedFileId > 0) { app.NexusFileId = app.Release.SelectedFileId; app.AssetName = app.Release.Assets.First(a => a.FileId == app.NexusFileId).Name; }
+            app.Error = app.NexusFileId > 0 && Repositories.Resolve(app.Repo).Host == "nexusmods.com" && app.Release.SelectedFileId == 0 ? "The tracked Nexus file is no longer available. Choose its replacement in App settings." : "";
+            app.CheckedAt = DateTimeOffset.UtcNow;
+        }
         catch (Exception ex) { app.Error = ex is OperationCanceledException ? "Check timed out" : ex.Message; }
     }
     private async Task CheckAll(bool manual)
@@ -295,6 +302,12 @@ public partial class MainWindow : Window
     private async void Update_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { CanUpdate: true } app || ReleaseFiles.Match(app) is not { } asset || preview) return;
+        if (asset.OriginHost == "nexusmods.com" && !github.Nexus.CanDownload)
+        {
+            try { Process.Start(new ProcessStartInfo(NexusMods.FilePage(app.Repo, asset)) { UseShellExecute = true }); ActionErrorLabel.Text = ""; }
+            catch (Exception ex) { ActionErrorLabel.Text = "Could not open the Nexus download page."; ActionErrorLabel.ToolTip = ex.Message; }
+            return;
+        }
         busy = true; Progress.Visibility = Visibility.Visible; Render();
         operation = new(); CancelDownload.Visibility = Visibility.Visible;
         try { await UpdateRunner.Run(this, app, asset, github, (text, value) => { StatusLabel.Text = app.Repo + ": " + text; Progress.Value = value; Progress.IsIndeterminate = text.StartsWith("Inspecting") || text.StartsWith("Applying") || text.StartsWith("Replacing"); CancelDownload.IsEnabled = text.StartsWith("Downloading") || text.StartsWith("Inspecting ZIP"); }, Persist, operation.Token); }
