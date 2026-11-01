@@ -54,7 +54,7 @@
     <StackPanel Grid.Column="1" Orientation="Horizontal">
      <TextBlock x:Name="SelfUpdateLabel" VerticalAlignment="Center" Foreground="#A4B4C9" Margin="0,0,6,0"/>
      <Button x:Name="CheckSelfButton" Content="Check GROUT updates" Click="CheckSelf_Click" Margin="0,0,4,0"/>
-     <Button x:Name="InstallSelfButton" Content="Update and restart" Click="InstallSelf_Click" Visibility="Collapsed" Background="#267E70" Margin="0,0,4,0"/>
+     <Button x:Name="InstallSelfButton" Content="Update GROUT" Click="InstallSelf_Click" Visibility="Collapsed" Background="#267E70" Margin="0,0,4,0"/>
      <Button x:Name="SettingsButton" Content="Settings" Click="Settings_Click" Margin="0"/>
     </StackPanel>
    </Grid>

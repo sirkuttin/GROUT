@@ -248,3 +248,7 @@
 ## 0.5.7 release
 - Right-aligned sidebar statuses; removed routine success messages and suppressed persisted legacy success text. Empty selected-app message area collapses; real issues remain visible.
 - Full packaged regression suite includes success suppression and issue preservation checks.
+
+## 0.5.8 release
+- GROUT check and update buttons are mutually exclusive. Available updates show Update GROUT; restart behavior is unchanged.
+- Updated current documentation and screenshots; full packaged suite required for publication.

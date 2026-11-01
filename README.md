@@ -12,7 +12,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*Current 0.5.7 interface with sample data.*
+*Current 0.5.8 interface with sample data.*
 
 ## What it does
 
@@ -21,7 +21,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 - **Tracks installed versions** from EXE metadata or manifests, with manual tracking when needed.
 - **Stays out of the way:** scheduled checks, tray notifications, quiet mode and optional start at sign-in.
 - **Finds missing installations:** locate a moved app or stop tracking one you removed.
-- **Updates itself** from this repository's stable releases after you choose **Update and restart**.
+- **Updates itself** from this repository's stable releases after you choose **Update GROUT**.
 
 ## Get started
 

@@ -97,7 +97,7 @@ public partial class MainWindow : Window
                 preferences.SelfUpdateNotifiedTag = selfRelease.Tag;
             }
         }
-        catch (Exception ex) { selfRelease = null; InstallSelfButton.Visibility = Visibility.Collapsed; SelfUpdateLabel.Text = "GROUT update check failed · Try again"; if (manual) StatusLabel.Text = ex is OperationCanceledException ? "GROUT update check timed out." : ex.Message; }
+        catch (Exception ex) { selfRelease = null; SelfUpdateLabel.Text = "GROUT update check failed · Try again"; if (manual) StatusLabel.Text = ex is OperationCanceledException ? "GROUT update check timed out." : ex.Message; }
         finally { selfChecking = false; SafePersist(); Render(); }
     }
     private async void CheckSelf_Click(object sender, RoutedEventArgs e) => await CheckSelf(true);
@@ -142,6 +142,8 @@ public partial class MainWindow : Window
     {
         var app = Current;
         CheckSelfButton.IsEnabled = InstallSelfButton.IsEnabled = !busy && !selfChecking;
+        CheckSelfButton.Visibility = selfRelease == null ? Visibility.Visible : Visibility.Collapsed;
+        InstallSelfButton.Visibility = selfRelease != null ? Visibility.Visible : Visibility.Collapsed;
         if (SelfUpdateLabel.Text.Length == 0) SelfUpdateLabel.Text = "GROUT " + SelfUpdater.CurrentLabel;
         CountLabel.Text = checkingApps ? "Checking for updates…" : $"{apps.Count} app(s) · {apps.Count(a => a.CanUpdate && ReleaseFiles.Match(a) != null)} update(s) ready";
         AddAppButton.IsEnabled = AppSettingsButton.IsEnabled = SettingsButton.IsEnabled = CheckButton.IsEnabled = !busy;

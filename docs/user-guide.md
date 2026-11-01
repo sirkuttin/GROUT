@@ -99,7 +99,7 @@ Notifications announce new app/release tags once. **Quiet mode** suppresses them
 
 GROUT checks this repository's stable releases on startup and daily, separately from the tracked-app schedule. Turn this off with **Check for GROUT updates automatically (daily)** in Settings, or use **Check GROUT updates** manually. The GROUT version and update controls sit immediately to the left of **Settings** at the bottom right of the main window.
 
-Choose **Update and restart** when a newer release is available. GROUT verifies the EXE against the exact release SHA-256 checksum, prepares a helper, closes the running instance, replaces its EXE and relaunches it. Library and settings remain intact. Protected folders may need a manual update; no silent elevation is attempted.
+When a newer release is available, **Update GROUT** replaces **Check GROUT updates**. Only one action is shown. Choose **Update GROUT** to install it and restart. GROUT verifies the EXE against the exact release SHA-256 checksum, prepares a helper, closes the running instance, replaces its EXE and relaunches it. Library and settings remain intact. Protected folders may need a manual update; no silent elevation is attempted.
 
 Self-updates require no credentials or GitHub CLI. Previews and downgrades are excluded. Version 0.4.x needs one manual upgrade to 0.5.0 because it does not contain the self-updater.
 
