@@ -31,7 +31,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 The Windows x64 download is a **single portable EXE** with .NET included. No installer, adjacent DLLs or separate .NET installation is required. Your library and settings live in AppData; see [storage and cleanup](docs/user-guide.md#storage-and-cleanup).
 
-> **Early release:** the EXE is currently unsigned. Close third-party apps before updating their files. GROUT asks before installing updates. Features on `main` may be newer than the latest release.
+> **Early release:** the EXE is currently unsigned. Close third-party apps before updating their files. File updates start when you choose Update; external installers and GROUT self-updates have their own confirmation. Features on `main` may be newer than the latest release.
 
 ## Learn more
 

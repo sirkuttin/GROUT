@@ -48,4 +48,4 @@ Tracked-app downloads are checked against the published byte count and SHA-256 d
 
 ZIP inspection rejects unsafe paths, Windows device names, duplicate/colliding paths, archive links and linked destination paths. Limits are 10,000 entries and 8 GB uncompressed data. Download cancellation preserves destination files; file application completes or attempts rollback once started.
 
-A developer can still publish an unsuitable package. Review the selected file, destination and file selections before applying it. GROUT does not forcibly shut down third-party apps or silently elevate file updates.
+A developer can still publish an unsuitable package. Choose the release file and destination carefully; included archive files overwrite matching files. GROUT does not forcibly shut down third-party apps or silently elevate file updates.

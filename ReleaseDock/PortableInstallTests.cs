@@ -86,8 +86,8 @@ public static class PortableInstallTests
                 Check(store.Load().Single().InstallLocation == target && store.Load().Single().IsCurrent, "Completed result adds to persistent library with correct exact file");
             }
             finally { window.Close(); }
-            var allowReview = false;
-            var retryPrompts = new UpdatePrompts { LeaveSetup = _ => true, ReviewFiles = (_, _, _, _) => allowReview, RunInstaller = (_, _) => false };
+            var overwriteReviews = 0;
+            var retryPrompts = new UpdatePrompts { LeaveSetup = _ => true, ReviewFiles = (_, _, _, _) => { overwriteReviews++; throw new Exception("Unexpected review screen"); }, RunInstaller = (_, _) => false };
             var retry = new SetupWindow(github, [], updatePrompts: retryPrompts, newWork: Work);
             try
             {
@@ -95,12 +95,8 @@ public static class PortableInstallTests
                 var folder = Path.Combine(root, "retry"); Directory.CreateDirectory(folder);
                 var target = Path.Combine(folder, "CircuitLordVRModInstaller.exe"); File.WriteAllText(target, "original");
                 ChoosePortable(retry, folder);
-                Button(retry, "Save and add app").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-                await Until(() => Find<TextBlock>(retry).Any(t => t.Text.Contains("Nothing was installed or added")));
-                Check(File.ReadAllText(target) == "original" && retry.Result.Installed == "", "Cancelled review does not install or mark release");
-                Check(Find<Button>(retry).Any(b => Equals(b.Content, "Save and add app")) && !Find<TextBlock>(retry).Any(t => t.Text == "Where is it installed?"), "Cancelled review stays on portable page with retry action");
-                allowReview = true;
-                Check(FinishDialog(retry, "Save and add app") == true && File.ReadAllBytes(target).SequenceEqual(PortableExeFixture.Bytes()), "Retry after cancelled review actually saves and completes");
+                Check(FinishDialog(retry, "Save and add app") == true && File.ReadAllBytes(target).SequenceEqual(PortableExeFixture.Bytes()), "Existing portable EXE is overwritten without a review step");
+                Check(overwriteReviews == 0 && retry.Result.LastBackup == "", "Overwrite review never invoked and temporary rollback cleaned");
             }
             finally { retry.Close(); }
             var declined = new SetupWindow(github, [], updatePrompts: prompts, newWork: Work);

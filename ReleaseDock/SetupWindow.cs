@@ -270,7 +270,7 @@ public sealed class SetupWindow : Window
                     }
                     folder.TextChanged += (_, _) => Validate(); if (filename != null) filename.TextChanged += (_, _) => Validate(); Validate();
                     finish.Content = selectedMethod == "ReplaceExe" ? "Save and add app" : "Extract and add app";
-                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "The EXE will be saved here without being run. Future updates replace this same file." : "GROUT will create a subfolder named after the app. Future updates use that app folder. You'll review archive paths and any existing files before extraction.", muted: true));
+                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "The EXE will be saved here without being run. Future updates replace this same file." : "GROUT will create a subfolder named after the app. Future updates use that app folder. Files included in the ZIP overwrite existing files.", muted: true));
                 }
                 else
                 {

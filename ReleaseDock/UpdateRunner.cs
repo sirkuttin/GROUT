@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
 
 namespace ReleaseDock;
 
@@ -12,7 +10,8 @@ public sealed class UpdatePrompts
 {
     public Func<string, Task> ExecuteInstaller { get; init; } = async path => { using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); if (process != null) await process.WaitForExitAsync(); };
     public Func<Window, bool> LeaveSetup { get; init; } = owner => MessageBox.Show(owner, "Leave setup? Downloads and any installation already performed stay on disk, but this app will not be added to your library.", "Leave Add App", MessageBoxButton.YesNo) == MessageBoxResult.Yes;
-    public Func<Window, List<UpdateFile>, string?, string, bool> ReviewFiles { get; init; } = UpdateRunner.Review;
+    // Kept as a regression-test hook: applying files must never invoke a review.
+    public Func<Window, List<UpdateFile>, string?, string, bool> ReviewFiles { get; init; } = (_, _, _, _) => true;
     public Func<Window, Asset, bool> RunInstaller { get; init; } = (owner, asset) => MessageBox.Show(owner, $"Run this installer?\n\n{asset.Name}\n\nThe installer controls its destination. GROUT will check the configured version source afterward.", "Run installer", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
 }
 
@@ -93,7 +92,6 @@ public static class UpdateRunner
             ValidatePortableExe(path);
             var target = Path.GetFullPath(app.UpdateTarget);
             var plan = new List<UpdateFile> { new() { Source = path, Target = target, Relative = Path.GetFileName(target), Existed = File.Exists(target) } };
-            if ((!newInstall || File.Exists(target)) && !prompts.ReviewFiles(owner, plan, null, app.UpdateTarget)) return UpdateOutcome.Deferred;
             status("Replacing app file…", 100);
             app.LastBackup = newWork("backups"); persist();
             var previous = InstallationSnapshot.Capture(app);
@@ -107,12 +105,12 @@ public static class UpdateRunner
             var staging = await Task.Run(() => FileUpdates.StageZip(path, newWork("staging"), cancel));
             cancel.ThrowIfCancellationRequested();
             var plan = FileUpdates.Plan(staging, app.UpdateTarget, false);
-            if (!prompts.ReviewFiles(owner, plan, staging, app.UpdateTarget)) return UpdateOutcome.Deferred;
-            status("Applying selected files…", 100);
+            foreach (var file in plan) file.Apply = true;
+            status("Extracting ZIP…", 100);
             app.LastBackup = newWork("backups"); persist();
             var previous = InstallationSnapshot.Capture(app);
             await Task.Run(() => FileUpdates.Apply(plan, app.UpdateTarget, app.LastBackup, previous));
-            app.PartialUpdate = plan.Any(f => !f.Apply && !f.SettingsOrData);
+            app.PartialUpdate = false;
             app.UpdateState = "Files applied — installation not yet verified"; persist();
         }
         InstalledVersions.Reconcile(app);
@@ -147,33 +145,5 @@ public static class UpdateRunner
         {
             throw new IOException("The downloaded file is not a complete Windows executable. The installed app has not been replaced.", ex);
         }
-    }
-    public static bool Review(Window owner, List<UpdateFile> files, string? staging, string target)
-    {
-        var window = Ui.Window("Review files before applying", 930, 730); window.Owner = owner;
-        var panel = Ui.Panel(window);
-        panel.Children.Add(Ui.Text("Review the update", 26));
-        panel.Children.Add(Ui.Text("Destination: " + target));
-        panel.Children.Add(Ui.Text("Checked files will be added or replaced. Replaced files are backed up. Files absent from the download stay in place. Close the app before applying. Existing settings/save files are unchecked by default; review the list before continuing.", muted: true));
-        var strip = Ui.Check("Remove the archive's single outer folder"); strip.Visibility = staging == null ? Visibility.Collapsed : Visibility.Visible;
-        panel.Children.Add(strip);
-        var grid = new DataGrid { ItemsSource = files, AutoGenerateColumns = false, Height = 330, CanUserAddRows = false, CanUserDeleteRows = false, Background = System.Windows.Media.Brushes.White, Foreground = System.Windows.Media.Brushes.Black };
-        var textStyle = new Style(typeof(TextBlock)); textStyle.Setters.Add(new Setter(TextBlock.ForegroundProperty, System.Windows.Media.Brushes.Black)); grid.Resources.Add(typeof(TextBlock), textStyle);
-        TextBlock Header(string text) => new() { Text = text, Foreground = System.Windows.Media.Brushes.Black, FontWeight = FontWeights.SemiBold, Margin = new Thickness(4) };
-        grid.Columns.Add(new DataGridCheckBoxColumn { Header = Header("Apply"), Binding = new Binding("Apply") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged } });
-        grid.Columns.Add(new DataGridTextColumn { Header = Header("Path relative to destination"), Binding = new Binding("Relative"), Width = new DataGridLength(1, DataGridLengthUnitType.Star), IsReadOnly = true });
-        grid.Columns.Add(new DataGridTextColumn { Header = Header("Action"), Binding = new Binding("Action"), IsReadOnly = true });
-        panel.Children.Add(grid);
-        var error = Ui.Text("", muted: true); panel.Children.Add(error);
-        strip.Click += (_, _) =>
-        {
-            try { var replacement = FileUpdates.Plan(staging!, target, strip.IsChecked == true); files.Clear(); files.AddRange(replacement); grid.ItemsSource = null; grid.ItemsSource = files; error.Text = "Review the updated destination mapping and file selections."; }
-            catch (Exception ex) { strip.IsChecked = false; error.Text = ex.Message; }
-        };
-        var row = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
-        row.Children.Add(Ui.Button("Cancel", (_, _) => window.DialogResult = false));
-        row.Children.Add(Ui.Button("Back up and apply selected files", (_, _) => { grid.CommitEdit(); grid.CommitEdit(DataGridEditingUnit.Row, true); if (files.Any(f => f.Apply)) window.DialogResult = true; else error.Text = "Select at least one file."; }));
-        panel.Children.Add(row);
-        return window.ShowDialog() == true;
     }
 }

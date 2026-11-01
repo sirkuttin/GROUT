@@ -121,22 +121,8 @@ public partial class App : Application
                 SavePreview(window, otherOutput);
                 window.Close(); Shutdown(); return;
             }
-            if (e.Args is ["--preview-files", var filesOutput])
-            {
-                var owner = new MainWindow(true); owner.Show();
-                var files = new List<UpdateFile>
-                {
-                    new() { Relative = "DesktopApp.exe", Existed = true },
-                    new() { Relative = "settings.ini", Existed = true, Apply = false },
-                    new() { Relative = "release-manifest.json", Existed = true },
-                    new() { Relative = @"assets\new-icon.png" }
-                };
-                _ = Dispatcher.InvokeAsync(() => { var dialog = owner.OwnedWindows.Cast<Window>().Single(); SavePreview(dialog, filesOutput); dialog.Close(); }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                UpdateRunner.Review(owner, files, null, @"C:\Apps\DesktopApp");
-                owner.Close(); Shutdown(); return;
-            }
             var help = e.Args is ["--help"] or ["-h"];
-            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --preview-files PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
+            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
             Shutdown(help ? 0 : 2); return;
         }
         instance = new Mutex(true, @"Local\ReleaseDock-" + Environment.UserName, out var first);

@@ -27,7 +27,7 @@ GROUT records the release it saved. If the EXE supplies matching version metadat
 
 Choose the parent folder. GROUT creates an app-named subfolder: choosing `C:\Apps` for Gram produces `C:\Apps\Gram`. The full destination is shown before confirmation; future updates use that app folder. Existing app locations are unchanged.
 
-Review the archive paths and file selections before extraction. For an archive with one outer folder, the review can remove that outer level from the destination mapping.
+ZIP installs and updates extract directly into the configured app folder. Archive structure is preserved. Included files overwrite matching files without a review or conflict dialog; files absent from the archive remain unchanged.
 
 ### Installer
 
@@ -47,16 +47,16 @@ Cancelling setup does not add an app to the library or undo an installation alre
 
 | Update method | Behavior |
 | --- | --- |
-| **Replace app EXE** | Review and replace the configured portable EXE. Close the app first. |
+| **Replace app EXE** | Replace the configured portable EXE without an overwrite-review step. Close the app first. |
 | **Run installer** | Download the EXE/MSI and ask before launching it. The installer chooses its destination. |
-| **Extract ZIP into app folder** | Stage the archive, review additions/replacements and apply selected files. |
+| **Extract ZIP into app folder** | Validate and extract all archive files, overwriting matching files automatically. |
 | **Download only** | Open the package folder so you can install/copy it yourself. Then recheck or mark the installed version. |
 
 An EXE's extension does not reveal whether it is an installer or a portable app; choose its intended use explicitly. Other app formats, including MSIX and 7z, use manual handling.
 
 The selected download is remembered across version-number changes when the same filename family and architecture can be matched. Renamed or ambiguous assets require another selection in App settings. **Show all downloads** exposes files hidden by the normal [Windows filter](supported-sources.md#windows-downloads).
 
-ZIP updates preserve files absent from the archive. Likely settings/save files are unchecked by default using conservative filename rules; review those selections yourself. Skipping other app files produces a partial-update warning, even if a new manifest reports the latest version.
+ZIP updates overwrite every included file, including matching settings/save files. Files absent from the archive are left unchanged. There is no file-selection screen.
 
 Temporary rollback copies protect a file update while it is applied. Completed updates **do not retain recovery backups**. If an operation cannot roll back safely, recovery information is retained for troubleshooting.
 

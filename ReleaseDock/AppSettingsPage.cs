@@ -97,8 +97,8 @@ public sealed class AppSettingsPage
         {
             action.Text = Method switch
             {
-                "ReplaceExe" => "Updates will replace:\n" + SetupPaths.PortableExe(draft.Folder, draft.FileName) + "\nA temporary backup protects this operation; it is removed afterward.",
-                "Zip" => "ZIP updates will be extracted into:\n" + draft.Folder + "\nYou'll review files before applying.",
+                "ReplaceExe" => "Updates will replace:\n" + SetupPaths.PortableExe(draft.Folder, draft.FileName) + "",
+                "Zip" => "ZIP updates will be extracted into:\n" + draft.Folder + "\nFiles included in the ZIP overwrite existing files.",
                 "Installer" => "The installer controls its destination. App folder identifies the installation to check afterward.",
                 _ => "Download the update and open its folder. Apply the update yourself."
             };
