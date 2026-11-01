@@ -151,3 +151,6 @@ dotnet tool run dotnet-script -- scripts/release.csx -- --version 0.4.8 --notes 
 ```
 
 The script validates the project version, requires a clean main branch and matching origin before publication, builds into a new isolated directory, enforces exactly one EXE, and runs the packaged self-tests. It writes distributable files under `outputs/releases/<version>/`, pushes main, uploads a draft release targeting the tested commit, verifies SHA-256 and size for all three assets, then publishes it as latest. Repository visibility is unchanged. Existing releases are never overwritten. If upload or verification fails, inspect the draft on GitHub before retrying; the script refuses to overwrite an existing release, including a draft. All options use flags; unknown or duplicate flags fail with usage. `--version` defaults to the project version, `--repo` to `sirkuttin/GROUT`, and `--notes` is mandatory for `--publish`.
+
+New portable ZIP installations treat the chosen folder as a parent and automatically create an app-named subfolder (for example, choosing C:\Apps for Gram produces C:\Apps\Gram). The full extraction path is shown before confirmation. Future updates use that saved app folder. Existing app locations and ZIP update destinations are unchanged.
+

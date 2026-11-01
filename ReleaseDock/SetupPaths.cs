@@ -4,6 +4,18 @@ namespace ReleaseDock;
 
 public static class SetupPaths
 {
+    public static string PortableZip(string parent, string appName)
+    {
+        parent = parent.Trim().Trim('"');
+        if (!Path.IsPathFullyQualified(parent) || File.Exists(parent)) throw new InvalidOperationException("Choose a full parent folder path for the app.");
+        var invalid = Path.GetInvalidFileNameChars();
+        var name = new string(appName.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim().TrimEnd('.', ' ');
+        if (name.Length == 0 || name is "." or "..") name = "App";
+        if (name.Length > 100) name = name[..100].TrimEnd('.', ' ');
+        try { FileUpdates.SafeRelative(name); }
+        catch (IOException) { name = "App-" + name; FileUpdates.SafeRelative(name); }
+        return Path.GetFullPath(Path.Combine(parent, name));
+    }
     public static string PortableExe(string folder, string filename)
     {
         folder = folder.Trim().Trim('"'); filename = filename.Trim();

@@ -207,6 +207,7 @@ public sealed class SetupWindow : Window
         string selectedMethod = "";
         string destinationFolder = Directory.Exists(Result.UpdateTarget) || !Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Result.UpdateTarget : Path.GetDirectoryName(Result.UpdateTarget) ?? "";
         if (destinationFolder.Length == 0) destinationFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "apps");
+        if (Result.UpdateMethod == "Zip" && Result.UpdateTarget.Length > 0 && Path.GetDirectoryName(Result.UpdateTarget) is { Length: > 0 } zipParent && string.Equals(SetupPaths.PortableZip(zipParent, Result.AppName), Result.UpdateTarget, StringComparison.OrdinalIgnoreCase)) destinationFolder = zipParent;
         string chosenFilename = Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(Result.UpdateTarget) : "";
         void Configure()
         {
@@ -235,7 +236,7 @@ public sealed class SetupWindow : Window
                 destination.Children.Clear(); folder = null; filename = null; message.Text = "";
                 if (selectedMethod is "ReplaceExe" or "Zip")
                 {
-                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "Save in folder" : "Extract into folder", 18));
+                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "Save in folder" : "Create app folder inside", 18));
                     folder = Ui.Input(destinationFolder); System.Windows.Automation.AutomationProperties.SetName(folder, "Save in folder"); destination.Children.Add(folder);
                     destination.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new OpenFolderDialog { Title = "Choose where to save the app" }; if (picker.ShowDialog(this) == true) folder.Text = picker.FolderName; }));
                     if (selectedMethod == "ReplaceExe")
@@ -248,7 +249,7 @@ public sealed class SetupWindow : Window
                         try
                         {
                             destinationFolder = folder.Text; chosenFilename = filename?.Text ?? "";
-                            var finalPath = selectedMethod == "ReplaceExe" ? SetupPaths.PortableExe(folder.Text, filename!.Text) : Path.IsPathFullyQualified(folder.Text) ? Path.GetFullPath(folder.Text) : throw new InvalidOperationException("Choose a full destination folder path.");
+                            var finalPath = selectedMethod == "ReplaceExe" ? SetupPaths.PortableExe(folder.Text, filename!.Text) : SetupPaths.PortableZip(folder.Text, Result.AppName);
                             Result.UpdateTarget = finalPath;
                             ReleaseFiles.Validate(Result, asset);
                             path.Text = (selectedMethod == "ReplaceExe" ? "Will save:\n" : "Will extract into:\n") + finalPath; message.Text = ""; finish.IsEnabled = !working;
@@ -257,7 +258,7 @@ public sealed class SetupWindow : Window
                     }
                     folder.TextChanged += (_, _) => Validate(); if (filename != null) filename.TextChanged += (_, _) => Validate(); Validate();
                     finish.Content = selectedMethod == "ReplaceExe" ? "Save and add app" : "Extract and add app";
-                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "The EXE will be saved here without being run. Future updates replace this same file." : "You'll review archive paths and any existing files before extraction.", muted: true));
+                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "The EXE will be saved here without being run. Future updates replace this same file." : "GROUT will create a subfolder named after the app. Future updates use that app folder. You'll review archive paths and any existing files before extraction.", muted: true));
                 }
                 else
                 {

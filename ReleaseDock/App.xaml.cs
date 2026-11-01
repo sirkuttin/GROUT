@@ -40,7 +40,7 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }

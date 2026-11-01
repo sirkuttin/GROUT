@@ -6,6 +6,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Version>0.4.8</Version>
+    <Version>0.4.9</Version>
   </PropertyGroup>
 </Project>

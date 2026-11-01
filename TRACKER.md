@@ -163,3 +163,8 @@
 ## 2026-10-31 — Repeatable C# releases
 - User requested publishing 0.4.8 and a release script, explicitly selecting .csx. Added scripts/release.csx, pinned local dotnet-script tool manifest and versioned release notes. Script supports help and strict flags, isolated single-EXE build/testing, checksums, clean-main/remote/version validation, push, draft upload, digest/size verification and publication without changing repository visibility. Help and unknown-flag failure validated; 0.4.8 is being published through this script.
 
+
+## 2026-10-31 — App subfolders for new ZIP installations, 0.4.9
+- User requested an app-named subfolder under the chosen ZIP install parent. New-install ZIP setup now labels the parent clearly, previews the computed child destination and uses it for extraction and future updates. Back navigation preserves the parent without appending another nested child. Existing app settings remain unchanged.
+- Folder names sanitize invalid Windows characters and reserved names. Packaged full regression suite passed via release.csx in local-only mode, including 6 ZIP destination checks and actual extraction into the created subfolder.
+
