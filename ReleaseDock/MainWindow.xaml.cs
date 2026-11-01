@@ -157,12 +157,12 @@ public partial class MainWindow : Window
         SourceLabel.Text = app?.RepositoryUrl ?? "";
         VersionLabel.Text = app?.Versions ?? "Choose Add App to track an existing installation or install something new from a supported release host.";
         StateLabel.Text = app?.DisplayStatus ?? "";
-        var missing = app?.InstallationMissing == true;
+        var missing = app?.InstallationMissing == true && !app.UninstallPending;
         MissingBanner.Visibility = missing ? Visibility.Visible : Visibility.Collapsed;
         StateLabel.Visibility = VersionSection.Visibility = MethodLabel.Visibility = missing ? Visibility.Collapsed : Visibility.Visible;
         MissingMessage.Text = "The app may have been moved or uninstalled. Find it again or stop tracking it.\n\n" + app?.LocalStatus;
         StateLabel.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(app?.StatusColor ?? "#76DCC6"));
-        VersionSection.IsEnabled = UninstallButton.IsEnabled = AppSettingsButton.IsEnabled = !busy && !missing;
+        VersionSection.IsEnabled = UninstallButton.IsEnabled = RecoveryButton.IsEnabled = AppSettingsButton.IsEnabled = !busy && !missing && app?.UninstallPending != true;
         FindInstallationButton.IsEnabled = !busy;
         RemoveButton.Visibility = missing ? Visibility.Collapsed : Visibility.Visible;
         InstalledInput.Text = app?.Installed ?? "";
@@ -175,6 +175,7 @@ public partial class MainWindow : Window
         DownloadedButton.Visibility = app != null && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
         AppFolderButton.Visibility = !missing && app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         RecoveryButton.Visibility = app != null && File.Exists(Path.Combine(app.LastBackup, "recovery.json")) ? Visibility.Visible : Visibility.Collapsed;
+        KeepTrackingButton.Visibility = app?.UninstallPending == true ? Visibility.Visible : Visibility.Collapsed;
         Notes.Text = app?.Release?.Notes ?? "Check for releases to load notes.";
         CheckedLabel.Text = app?.CheckedAt is { } time ? $"Release checked {time.ToLocalTime():g}" : "Release not checked yet";
         RenderSchedule();
@@ -185,8 +186,9 @@ public partial class MainWindow : Window
         foreach (var app in apps)
         {
             InstalledVersions.Reconcile(app);
-            if (!app.LocalError && app.IsCurrent && !app.PartialUpdate && app.UpdateState.Length > 0) app.UpdateState = "Installed version detected";
+            if (!app.UninstallPending && !app.LocalError && app.IsCurrent && !app.PartialUpdate && app.UpdateState.Length > 0) app.UpdateState = "Installed version detected";
         }
+        CheckPendingUninstalls();
         SafePersist();
         if (!InstalledInput.IsKeyboardFocusWithin) Render();
     }
@@ -339,17 +341,68 @@ public partial class MainWindow : Window
         catch (Exception ex) { StatusLabel.Text = ex.Message; }
         finally { busy = false; Render(); }
     }
+    internal void CheckPendingUninstalls()
+    {
+        var pending = apps.Where(a => a.UninstallPending).ToList();
+        if (pending.Count == 0) return;
+        var registrations = InstallDiscovery.ReadRegistry();
+        foreach (var app in pending)
+        {
+            if (app.UninstallRegistrationId.Length > 0 && !AppUninstall.RegistrationGone(app.UninstallRegistrationId)) continue;
+            var index = apps.IndexOf(app);
+            try
+            {
+                if (AppUninstall.Complete(apps, app, registrations, Persist))
+                {
+                    Library.SelectedIndex = Math.Min(index, apps.Count - 1);
+                    StatusLabel.Text = app.AppName + " uninstalled and removed from the library.";
+                }
+            }
+            catch (Exception ex) { StatusLabel.Text = "Uninstall finished, but saving the library needs a retry: " + ex.Message; }
+        }
+    }
+    private async Task WatchUninstaller(TrackedApp app, Process process)
+    {
+        try
+        {
+            await process.WaitForExitAsync();
+            if (!apps.Contains(app) || !app.UninstallPending) return;
+            CheckPendingUninstalls();
+            if (apps.Contains(app))
+            {
+                if (process.ExitCode is not (0 or 3010))
+                {
+                    AppUninstall.KeepTracking(app); app.UpdateState = "Uninstall was cancelled or failed; the app is still tracked.";
+                }
+                else app.UpdateState = "Uninstall is not confirmed yet. GROUT is watching for removal. If you cancelled it, choose Keep tracking.";
+                SafePersist();
+            }
+        }
+        catch (Exception ex) { StatusLabel.Text = "Could not verify uninstall: " + ex.Message; }
+        finally { process.Dispose(); Render(); }
+    }
+    private void KeepTracking_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || Current is not { UninstallPending: true } app) return;
+        AppUninstall.KeepTracking(app); app.UpdateState = "Kept in library. This does not cancel a running Windows uninstaller.";
+        SafePersist(); Render();
+    }
     private void Uninstall_Click(object sender, RoutedEventArgs e)
     {
-        if (Current is not { } app || busy) return;
+        if (Current is not { } app || busy || app.UninstallPending) return;
         try
         {
             var registered = app.UpdateMethod is "ReplaceExe" or "Zip" ? null : AppUninstall.Registered(app, InstallDiscovery.ReadRegistry());
             if (registered != null)
             {
                 var command = AppUninstall.Command(registered.Uninstall);
-                if (MessageBox.Show(this, $"Uninstall {registered.Name}?\n\nWindows will open its uninstaller. Follow its prompts to finish.\n\n{command.FileName}\n{command.Arguments}\n\nGROUT will keep this library entry until you choose Stop tracking.", "Uninstall app", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-                Process.Start(command); StatusLabel.Text = "Uninstaller opened. When finished, choose Stop tracking to remove the library entry.";
+                if (MessageBox.Show(this, $"Uninstall {registered.Name}?\n\nWindows will open its uninstaller. Follow its prompts to finish. GROUT will remove this entry after removal is confirmed.\n\n{command.FileName}\n{command.Arguments}", "Uninstall app", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                var draft = AppLocationDraft.From(app);
+                var target = draft.FileName.Length > 0 ? Path.Combine(draft.Folder, draft.FileName) : draft.Folder;
+                AppUninstall.Begin(app, target, registered.Id); Persist();
+                var process = Process.Start(command) ?? throw new IOException("Windows did not start the uninstaller.");
+                StatusLabel.Text = "Uninstaller opened. GROUT will remove the entry after confirming removal.";
+                _ = WatchUninstaller(app, process);
             }
             else if (app.UpdateMethod == "ReplaceExe")
             {
@@ -357,31 +410,38 @@ public partial class MainWindow : Window
                 if (draft.Conflict) throw new InvalidOperationException("Resolve the app location conflict in App settings first.");
                 var target = SetupPaths.PortableExe(draft.Folder, draft.FileName);
                 if (!File.Exists(target)) throw new FileNotFoundException("App EXE was not found. Check App settings.");
-                if (MessageBox.Show(this, $"Remove the portable app EXE?\n\n{target}\n\nClose the app first. This moves only this EXE to the Recycle Bin. Settings, other files, backups and the library entry will remain.", "Remove portable app", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                if (MessageBox.Show(this, $"Remove {app.AppName}?\n\n{target}\n\nClose the app first. This moves only this EXE to the Recycle Bin and removes its GROUT entry. Settings and other files remain.", "Remove portable app", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                busy = true; AppUninstall.Begin(app, target); Persist(); Render();
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(target, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                StatusLabel.Text = "App EXE moved to the Recycle Bin. Choose Stop tracking to remove the library entry.";
+                CheckPendingUninstalls();
             }
             else if (app.UpdateMethod == "Zip")
             {
                 var draft = AppLocationDraft.From(app);
                 if (draft.Conflict) throw new InvalidOperationException("Resolve the app location conflict in App settings first.");
                 var target = AppUninstall.PortableFolder(draft.Folder);
-                if (MessageBox.Show(this, $"Remove {app.AppName} and its entire app folder?\n\n{target}\n\nClose the app first. ALL files and subfolders here, including settings and any files you added, will move to the Recycle Bin. Check that this folder belongs only to this app.\n\nThe library entry will remain until you choose Stop tracking.", "Remove portable app folder", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                if (MessageBox.Show(this, $"Remove {app.AppName} and its entire app folder?\n\n{target}\n\nClose the app first. ALL files and subfolders here, including settings and any files you added, will move to the Recycle Bin. Check that this folder belongs only to this app. Its GROUT entry will also be removed.", "Remove portable app folder", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                busy = true; AppUninstall.Begin(app, target); Persist(); Render();
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(target, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                StatusLabel.Text = "App folder moved to the Recycle Bin. Choose Stop tracking to remove the library entry.";
+                CheckPendingUninstalls();
             }
             else
             {
-                MessageBox.Show(this, "No unique Windows uninstaller was found for this app folder. Windows Installed apps will open so you can select it.", "Uninstall app");
+                MessageBox.Show(this, "No unique Windows uninstaller was found. Windows Installed apps will open so you can select the app. GROUT will watch its saved location and remove this entry when removal is confirmed. Choose Keep tracking if you cancel.", "Uninstall app");
+                var draft = AppLocationDraft.From(app);
+                var target = draft.FileName.Length > 0 ? Path.Combine(draft.Folder, draft.FileName) : draft.Folder;
+                if (Path.IsPathFullyQualified(target)) { AppUninstall.Begin(app, target); Persist(); }
                 Process.Start(new ProcessStartInfo("ms-settings:appsfeatures") { UseShellExecute = true });
             }
         }
-        catch (Exception ex) { StatusLabel.Text = "Could not uninstall: " + ex.Message; }
+        catch (Exception ex) { if (!AppUninstall.CanConfirm(app, InstallDiscovery.ReadRegistry())) AppUninstall.KeepTracking(app); app.UpdateState = "Uninstall did not finish: " + ex.Message; StatusLabel.Text = app.UpdateState; SafePersist(); }
+        finally { busy = false; Render(); }
     }
     private void Remove_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app) return;
-        if (MessageBox.Show(this, "Stop tracking " + app.Repo + "? Installed files and backups will stay in place.", "Stop tracking", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        var prompt = AppUninstall.TrackingPrompt(app);
+        if (MessageBox.Show(this, prompt.Message, prompt.Title, MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         apps.Remove(app); SafePersist(); Render();
     }
 }

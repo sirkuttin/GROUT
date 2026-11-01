@@ -30,7 +30,7 @@
       </Expander>
       <Expander Header="Release notes" Foreground="#F1F5FC" Margin="0,0,0,12"><TextBlock x:Name="Notes" TextWrapping="Wrap" Margin="0,12,0,0"/></Expander>
       <TextBlock x:Name="CheckedLabel" Foreground="#A4B4C9" Margin="0,10,0,12"/>
-      <WrapPanel><Button x:Name="RecoveryButton" Content="Restore previous files…" Click="Recovery_Click"/><Button x:Name="UninstallButton" Content="Uninstall…" Click="Uninstall_Click"/><Button x:Name="RemoveButton" Content="Stop tracking" Click="Remove_Click" Background="Transparent" Foreground="#F3A6AA"/></WrapPanel>
+      <WrapPanel><Button x:Name="RecoveryButton" Content="Restore previous files…" Click="Recovery_Click"/><Button x:Name="KeepTrackingButton" Content="Keep tracking" Click="KeepTracking_Click" Visibility="Collapsed" ToolTip="Stop waiting for uninstall completion. This does not cancel a running Windows uninstaller."/><Button x:Name="UninstallButton" Content="Uninstall…" Click="Uninstall_Click"/><Button x:Name="RemoveButton" Content="Stop tracking" Click="Remove_Click" Background="Transparent" Foreground="#F3A6AA"/></WrapPanel>
      </StackPanel>
     </StackPanel></ScrollViewer>
    </Border>

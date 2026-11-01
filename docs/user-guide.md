@@ -103,12 +103,14 @@ Self-updates require no credentials or GitHub CLI. Previews and downgrades are e
 
 | Action | Effect |
 | --- | --- |
-| **Uninstall…** for a registered app | Launches a uniquely matched Windows uninstaller. If none matches, opens Windows Installed apps. Follow its prompts; completion is not automatically verified. |
-| **Uninstall…** for a portable EXE | After confirmation, moves only the configured EXE to the Recycle Bin. |
-| **Uninstall…** for a portable ZIP app | After confirmation, moves the entire app folder and its contents to the Recycle Bin. Check that the folder belongs only to that app. System/common shared folders are blocked. |
+| **Uninstall…** for a registered app | Launches the matched Windows uninstaller and removes the library entry after its registration and any known EXE confirm removal. If no unique match exists, opens Windows Installed apps and watches the saved location. |
+| **Uninstall…** for a portable EXE | Moves only the confirmed EXE to the Recycle Bin, then removes its library entry. |
+| **Uninstall…** for a portable ZIP app | Moves the confirmed app folder and contents to the Recycle Bin, then removes its library entry. Check that the folder belongs only to that app. System/common shared folders are blocked. |
 | **Stop tracking** | Removes the library entry without uninstalling the app. |
 
-After uninstalling, choose **Stop tracking** to remove its library entry if desired.
+Cancelled, failed or unconfirmed removals retain the entry. Pending confirmation survives a restart and is checked when GROUT regains focus and during its background tick. **Keep tracking** stops waiting; it does not cancel a running Windows uninstaller. Entries already left behind by older GROUT versions can be removed with **Stop tracking**.
+
+For an **App not found** entry, Stop tracking asks to remove the missing library entry. It does not claim installed files or backups remain. Apps removed outside GROUT continue to offer Find installation and Stop tracking rather than being silently dropped.
 
 ## Storage and cleanup
 

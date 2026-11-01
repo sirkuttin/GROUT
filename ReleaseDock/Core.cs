@@ -35,6 +35,9 @@ public sealed class TrackedApp
     public string AppFile { get; set; } = "";
     public string VersionSourceOverride { get; set; } = "";
     public bool PartialUpdate { get; set; }
+    public bool UninstallPending { get; set; }
+    public string UninstallRegistrationId { get; set; } = "";
+    public string UninstallTarget { get; set; } = "";
     [JsonIgnore] public bool PendingLocationConflict { get; set; }
     [JsonIgnore] public List<InstallationCandidate> InstallCandidates { get; set; } = [];
     [JsonIgnore] public string InstallDiscoveryNote { get; set; } = "";
@@ -43,14 +46,14 @@ public sealed class TrackedApp
     [JsonIgnore] public string LocalStatus { get; set; } = "Manual version tracking";
     [JsonIgnore] public bool LocalError { get; set; }
     [JsonIgnore] public bool InstallationMissing { get; set; }
-    [JsonIgnore] public string StatusColor => InstallationMissing || LocalError ? "#F0D495" : "#76DCC6";
+    [JsonIgnore] public string StatusColor => UninstallPending || InstallationMissing || LocalError ? "#F0D495" : "#76DCC6";
     public DateTimeOffset? CheckedAt { get; set; }
     public Release? Release { get; set; }
     public string Error { get; set; } = "";
     [JsonIgnore] public bool IsCurrent => Installed.Length > 0 && InstalledVersions.Matches(Installed, Latest);
     [JsonIgnore] public bool IsOlderRelease => InstalledVersions.CompareVersionNumbers(Installed, Latest) is > 0;
-    [JsonIgnore] public bool CanUpdate => !InstallationMissing && Installed.Length > 0 && Latest.Length > 0 && (!IsCurrent || PartialUpdate) && !IsOlderRelease && Error.Length == 0 && !(AutoReconcile && LocalError) && Release?.Tag == Latest;
-    [JsonIgnore] public string Status => InstallationMissing ? "App not found" : Error.Length > 0 ? "Check failed" : AutoReconcile && LocalError ? "Installed version unverified" : PartialUpdate ? "Partial update — review files" : Latest.Length == 0 ? "Not checked" : Installed.Length == 0 ? "Version unknown" : IsCurrent ? "Up to date" : IsOlderRelease ? "Installed version is newer" : InstalledVersions.CompareVersionNumbers(Installed, Latest) is < 0 ? "Update available" : "Different release available";
+    [JsonIgnore] public bool CanUpdate => !UninstallPending && !InstallationMissing && Installed.Length > 0 && Latest.Length > 0 && (!IsCurrent || PartialUpdate) && !IsOlderRelease && Error.Length == 0 && !(AutoReconcile && LocalError) && Release?.Tag == Latest;
+    [JsonIgnore] public string Status => UninstallPending ? "Uninstall pending" : InstallationMissing ? "App not found" : Error.Length > 0 ? "Check failed" : AutoReconcile && LocalError ? "Installed version unverified" : PartialUpdate ? "Partial update — review files" : Latest.Length == 0 ? "Not checked" : Installed.Length == 0 ? "Version unknown" : IsCurrent ? "Up to date" : IsOlderRelease ? "Installed version is newer" : InstalledVersions.CompareVersionNumbers(Installed, Latest) is < 0 ? "Update available" : "Different release available";
     [JsonIgnore] public string Versions => $"{(InstallationMissing ? "Last known version" : "Installed")}: {(Installed.Length == 0 ? "unknown" : Installed)}    →    Latest: {(Latest.Length == 0 ? "unknown" : Latest)}";
     [JsonIgnore] public string DisplayStatus => CanUpdate && ReleaseFiles.Match(this) == null ? Release?.Assets.Any(a => Repositories.IsWindowsAsset(a.Name)) == true ? "Choose release download" : "No app downloads found" : Status;
 }

@@ -4,6 +4,54 @@ using System.Text.RegularExpressions;
 namespace ReleaseDock;
 public static class AppUninstall
 {
+    public static bool RegistrationGone(string id)
+    {
+        try
+        {
+            var parts = id.Split('/', 3);
+            if (parts.Length != 3 || !Enum.TryParse<Microsoft.Win32.RegistryHive>(parts[0], out var hive) || !Enum.TryParse<Microsoft.Win32.RegistryView>(parts[1], out var view)) return false;
+            using var root = Microsoft.Win32.RegistryKey.OpenBaseKey(hive, view);
+            using var key = root.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + parts[2]);
+            return key == null;
+        }
+        catch { return false; }
+    }
+    public static void Begin(TrackedApp app, string target, string registrationId = "")
+    {
+        app.UninstallPending = true; app.UninstallTarget = target; app.UninstallRegistrationId = registrationId;
+        app.UpdateState = "Waiting for uninstallation to finish";
+    }
+    public static void KeepTracking(TrackedApp app)
+    {
+        app.UninstallPending = false; app.UninstallTarget = ""; app.UninstallRegistrationId = "";
+    }
+    public static bool CanConfirm(TrackedApp app, IEnumerable<InstalledRegistration> registrations)
+    {
+        if (!app.UninstallPending || !Path.IsPathFullyQualified(app.UninstallTarget)) return false;
+        if (app.UninstallRegistrationId.Length > 0 && registrations.Any(r => r.Id == app.UninstallRegistrationId)) return false;
+        // Installers can deliberately leave an empty/data folder behind.
+        // When no exact EXE is known, removal of the corroborated registry entry
+        // is the completion signal, rather than deleting that leftover folder.
+        if (app.UninstallRegistrationId.Length > 0 && !app.UninstallTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return true;
+        try { _ = File.GetAttributes(app.UninstallTarget); return false; }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return true; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException) { return false; }
+    }
+    public static bool Complete(IList<TrackedApp> library, TrackedApp app, IEnumerable<InstalledRegistration> registrations, Action persist)
+    {
+        var index = library.IndexOf(app);
+        if (index < 0 || !CanConfirm(app, registrations)) return false;
+        library.RemoveAt(index);
+        try { persist(); }
+        catch { library.Insert(index, app); throw; }
+        return true;
+    }
+    public static (string Title, string Message) TrackingPrompt(TrackedApp app)
+    {
+        if (app.UninstallPending) return ("Stop tracking", $"Stop tracking {app.AppName}?\n\nThis removes its library entry but does not stop a running Windows uninstaller.");
+        if (app.InstallationMissing) return ("Remove missing app", $"Remove {app.AppName} from GROUT?\n\nIts saved install location was not found. This only removes the library entry.");
+        return ("Stop tracking", $"Stop tracking {app.AppName}?\n\nThis removes it from GROUT's library without changing app files.");
+    }
     public static string PortableFolder(string folder)
     {
         if (!Path.IsPathFullyQualified(folder)) throw new InvalidOperationException("Choose the app folder in App settings first.");
