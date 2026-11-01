@@ -67,10 +67,9 @@ GROUT.exe --preview-app-settings PNG_PATH
 GROUT.exe --preview-setup-first PNG_PATH
 GROUT.exe --preview-install PNG_PATH
 GROUT.exe --preview-portable PNG_PATH
-GROUT.exe --preview-files PNG_PATH
 ```
 
-Documentation [screenshots](images/) come from these previews. Use sample paths and avoid personal library details in public screenshots.
+Documentation [screenshots](images/) come from these previews. Build the current source first, then render the library, add-app, app-settings, portable and missing-app states. Preview commands use neutral sample paths and render the current app UI without loading your library. Inspect every PNG before replacing a public screenshot.
 
 ## Local files and notices
 

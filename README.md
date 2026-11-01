@@ -12,7 +12,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*GROUT 0.5.2 with sample data.*
+*Current 0.5.5 interface with sample data.*
 
 ## What it does
 
@@ -27,7 +27,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 1. Download **GROUT.exe** from the [latest release](https://github.com/sirkuttin/GROUT/releases/latest), save it in a permanent writable folder, and run it.
 2. Choose **Add App**, paste a supported repository or release link, then choose to track an existing app or install it.
-3. Choose the Windows download and how updates should work. GROUT shows the destination before applying file updates.
+3. Choose the Windows download and how updates should work. GROUT shows the destination before applying file updates; ZIPs and portable EXEs overwrite matching files directly.
 
 The Windows x64 download is a **single portable EXE** with .NET included. No installer, adjacent DLLs or separate .NET installation is required. Your library and settings live in AppData; see [storage and cleanup](docs/user-guide.md#storage-and-cleanup).
 

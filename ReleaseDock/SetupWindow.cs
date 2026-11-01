@@ -70,7 +70,7 @@ public sealed class SetupWindow : Window
         {
             Result = new() { Repo = "example/desktop-app", Installed = "v1.0.0", Latest = "v1.1.0", InstallLocation = @"C:\Apps\DesktopApp", UpdateTarget = @"C:\Apps\DesktopApp", UpdateMethod = "Installer", Release = new("v1.1.0", "", "", [new("DesktopApp-1.1.0-x64.exe", "", 100000, null)]) };
             if (previewStage == "first") { ScreenOne(); lookupTimer.Stop(); }
-            else { newInstall = previewStage is "install" or "portable"; if (newInstall) { SetupPaths.ClearExistingTracking(Result); if (previewStage == "portable") Result.UpdateMethod = "ReplaceExe"; } ScreenTwo(); }
+            else { newInstall = previewStage is "install" or "portable"; if (newInstall) { SetupPaths.ClearExistingTracking(Result); Result.UpdateTarget = @"C:\Apps"; if (previewStage == "portable") Result.UpdateMethod = "ReplaceExe"; } ScreenTwo(); }
         }
         else ScreenOne();
     }

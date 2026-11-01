@@ -86,10 +86,7 @@ public partial class App : Application
                 }
                 window.Show();
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(window);
-                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                using (var file = File.Create(output)) encoder.Save(file);
+                SavePreview(window, output);
                 window.Close(); Shutdown(); return;
             }
             if (e.Args is ["--preview-setup", var setupOutput])
@@ -98,16 +95,13 @@ public partial class App : Application
                 var window = new SetupWindow(github, [], preview: true);
                 window.Show();
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(window);
-                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                using (var file = File.Create(setupOutput)) encoder.Save(file);
+                SavePreview(window, setupOutput);
                 window.Close(); Shutdown(); return;
             }
             if (e.Args is ["--preview-app-settings", var settingsOutput])
             {
                 using var github = new ReleaseClient();
-                var sample = new TrackedApp { Repo = "example/desktop-app", Installed = "1.0.36.0", Latest = "hub-1.0.36", InstallLocation = @"C:\Apps\MultiverseVRHub.exe", UpdateMethod = "ReplaceExe", AssetName = "MultiverseVRHub.exe", Release = new("hub-1.0.36", "", "", [new("MultiverseVRHub.exe", "", 5760000, null)]) };
+                var sample = new TrackedApp { Repo = "example/desktop-app", Installed = "1.0.0", Latest = "v1.1.0", InstallLocation = @"C:\Apps\DesktopApp\DesktopApp.exe", UpdateMethod = "ReplaceExe", AssetName = "DesktopApp.exe", Release = new("v1.1.0", "", "", [new("DesktopApp.exe", "", 5760000, null)]) };
                 var window = new SetupWindow(github, [], edit: sample); window.Show();
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 SavePreview(window, settingsOutput); window.Close(); Shutdown(); return;

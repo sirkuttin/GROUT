@@ -66,7 +66,7 @@ public partial class MainWindow : Window
         };
         Closed += (_, _) => { timer.Stop(); if (tray != null) { tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Dispose(); tray = null; } trayIcon?.Dispose(); trayIcon = null; github.Dispose(); selfUpdater.Dispose(); };
         Activated += (_, _) => { if (!busy && OwnedWindows.Count == 0) ReconcileAll(); };
-        timer.Tick += async (_, _) => { if (busy || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); await CheckSelf(false); RenderSchedule(); };
+        timer.Tick += async (_, _) => { if (busy || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); await CheckSelf(false); };
         timer.Start();
         Loaded += async (_, _) =>
         {
@@ -138,12 +138,6 @@ public partial class MainWindow : Window
     internal bool TrayVisible => tray?.Visible == true;
     private void Persist() { if (preview) return; if (!busy && OwnedWindows.Count == 0) StorageCleanup.Sweep(apps); store.Save(apps); preferences.SourceBackoffs = github.Backoffs; preferences.Save(preferencesPath); Library.Items.Refresh(); }
     private void SafePersist() { try { Persist(); } catch (Exception ex) { StatusLabel.Text = "Could not save: " + ex.Message; } }
-    private void RenderSchedule()
-    {
-        var last = preferences.LastSuccess is { } time ? time.ToLocalTime().ToString("g") : "not yet";
-        var next = preferences.NextCheck is { } due ? due <= DateTimeOffset.UtcNow ? "due" : due.ToLocalTime().ToString("g") : "manual only";
-        ScheduleLabel.Text = $"Last successful check: {last}  ·  Next: {next}";
-    }
     private void Render()
     {
         var app = Current;
@@ -178,7 +172,7 @@ public partial class MainWindow : Window
         KeepTrackingButton.Visibility = app?.UninstallPending == true ? Visibility.Visible : Visibility.Collapsed;
         Notes.Text = app?.Release?.Notes ?? "Check for releases to load notes.";
         CheckedLabel.Text = app?.CheckedAt is { } time ? $"Release checked {time.ToLocalTime():g}" : "Release not checked yet";
-        RenderSchedule();
+
     }
     private void ReconcileAll()
     {
@@ -241,7 +235,7 @@ public partial class MainWindow : Window
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         if (busy || preview || OwnedWindows.Count > 0) return;
-        try { if (SettingsWindow.Show(this, preferences)) { RenderSchedule(); StatusLabel.Text = "Settings saved."; } }
+        try { if (SettingsWindow.Show(this, preferences)) { StatusLabel.Text = "Settings saved."; } }
         catch (Exception ex) { StatusLabel.Text = ex.Message; }
     }
     private void Selected(object sender, SelectionChangedEventArgs e) { Render(); VersionSection.IsExpanded = Current is { } app && (app.Installed.Length == 0 || app.LocalError); }

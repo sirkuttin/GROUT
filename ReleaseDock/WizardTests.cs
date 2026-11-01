@@ -93,7 +93,7 @@ public static class WizardTests
             main.Show();
             Check(main.IsVisible, "Hidden main window can reopen");
             Check(Children<Button>(main).Single(b => Equals(b.Content, "Update")).IsEnabled, "Cached checked release enables Update after restart");
-            Check(Children<TextBlock>(main).Any(t => t.Text.Contains("manual only")), "Manual polling schedule is visible");
+            Check(!Children<TextBlock>(main).Any(t => t.Text.Contains("Last successful check:")), "Footer omits polling timestamps");
             main.StopWindow();
             Check(!main.TrayVisible, "Explicit stop removes tray icon");
         }

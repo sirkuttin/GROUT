@@ -225,3 +225,15 @@
 - User explicitly rejected file-conflict review: files must be overwritten directly, and temporary rollback must be internal with no user-facing screen. Removed operational ZIP and portable-EXE overwrite reviews for both fresh installs and updates. ZIP plans apply every archive file, including existing settings/save files; absent files remain unchanged.
 - Removed the review dialog/preview command and backup/apply button wording. Updated setup/settings text and documentation to describe direct extraction/overwrite. Archive validation, safe paths, atomic writes and transient rollback on failures remain internal. No completed rollback copies are retained.
 - Packaged suite passed:17 ZIP-folder assertions cover new, conflicting first install, existing update, settings overwrite, absent-file preservation and scratch cleanup with review hooks that fail if invoked. Portable overwrite regression completes with no review and no retained backup. No real user app files changed during tests.
+
+## 2026-11-01 — Documentation and screenshot refresh
+
+- User requested a documentation agent to audit the documentation and stale screenshots after the footer/layout changes. Audited README, all six docs guides and SECURITY.md against current code; historical release notes remain historical.
+- Updated current interface caption, direct portable/ZIP overwrite explanations, silent temporary rollback, bottom-right self-update controls, removed polling timestamp claims and obsolete --preview-files diagnostic, and refreshed publishing examples using an explicitly illustrative next version.
+- Regenerated library, Add App and App settings previews; added portable EXE and missing-installation images to the user guide. Main-window previews include compact footer and narrower side margins. Previews use isolated sample data; portable setup now uses neutral C:\Apps rather than the current user's profile, and App settings uses a consistent DesktopApp sample.
+- Release build passed without warnings/errors; all five preview commands completed successfully, screenshots were visually inspected, 37 local documentation file/image references resolved, and git diff --check passed. No release published or user library changed.
+
+## 0.5.5 release
+- Approved compact main-window footer and margins; removed polling timestamp line without changing scheduling.
+- Refreshed documentation/screenshots and preview sample data. Full packaged regression suite and documentation links verified.
+

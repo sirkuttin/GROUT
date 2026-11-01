@@ -19,7 +19,9 @@ Tracking an existing app does not require a usable Windows download or successfu
 
 ### Portable EXE
 
-Choose **Save as a portable app**, select **Save in folder**, and confirm the filename and full destination. **Save and add app** saves the EXE without running it. Future updates replace that exact file.
+Choose **Save as a portable app**, select **Save in folder**, and confirm the filename and full destination. **Save and add app** saves the EXE without running it. Future updates replace that exact file without a file-review screen.
+
+<img src="images/portable-exe.png" alt="Portable EXE setup with one destination folder, filename and Save and add app button" width="580">
 
 GROUT records the release it saved. If the EXE supplies matching version metadata, automatic version reading is enabled. If metadata is missing or differs, GROUT retains the applied release and explains its source instead of treating the file save as a failure.
 
@@ -43,7 +45,7 @@ Cancelling setup does not add an app to the library or undo an installation alre
 
 **App settings** has one **App folder** field. For portable EXEs, **App file** is a filename; GROUT derives and displays the full replacement path. You can edit the app's display name here too.
 
-<img src="images/app-settings.png" alt="App settings with the app name, folder, release download and update method" width="580">
+<img src="images/app-settings.png" alt="App settings showing an editable repository URL, app name, app folder, app filename and update method" width="580">
 
 | Update method | Behavior |
 | --- | --- |
@@ -58,7 +60,7 @@ The selected download is remembered across version-number changes when the same 
 
 ZIP updates overwrite every included file, including matching settings/save files. Files absent from the archive are left unchanged. There is no file-selection screen.
 
-Temporary rollback copies protect a file update while it is applied. Completed updates **do not retain recovery backups**. If an operation cannot roll back safely, recovery information is retained for troubleshooting.
+Temporary rollback copies protect a file update internally while it is applied; there is no backup setup or backup-review screen. Completed updates **do not retain recovery backups**. If an operation cannot roll back safely, recovery information is retained for troubleshooting.
 
 ## Installed versions
 
@@ -81,9 +83,11 @@ Use **Installed version** to recheck once, enter a version, or **Mark latest as 
 
 GROUT checks saved locations even for manually tracked apps. Missing locations show **App not found**, with **Find installation** and **Stop tracking** as the main choices. Update, uninstall and version editing are disabled until the location is resolved. The previous version stays labeled as the last known version.
 
+<img src="images/missing-app.png" alt="App not found banner with Find installation and Stop tracking choices and disabled update controls" width="850">
+
 ## Checks, tray and startup
 
-In **Settings**, choose **Manual only**, **Every hour**, **Every 6 hours**, or **Every day** for tracked-app release checks. Daily is the default. Due checks run on launch and after wake; last-success and next-check times appear in the main window. Source-specific rate-limit/access pauses survive restarts.
+In **Settings**, choose **Manual only**, **Every hour**, **Every 6 hours**, or **Every day** for tracked-app release checks. Daily is the default. Due checks run on launch and after wake. Source-specific rate-limit/access pauses survive restarts.
 
 Closing the window leaves GROUT in the tray. Double-click the icon to reopen it, or right-click for **Open**, **Check now**, **Settings** and **Exit**. Exit stops checking.
 
@@ -93,7 +97,7 @@ Notifications announce new app/release tags once. **Quiet mode** suppresses them
 
 ## Update GROUT itself
 
-GROUT checks this repository's stable releases on startup and daily, separately from the tracked-app schedule. Turn this off with **Check for GROUT updates automatically (daily)** in Settings, or use **Check GROUT updates** manually.
+GROUT checks this repository's stable releases on startup and daily, separately from the tracked-app schedule. Turn this off with **Check for GROUT updates automatically (daily)** in Settings, or use **Check GROUT updates** manually. The GROUT version and update controls sit immediately to the left of **Settings** at the bottom right of the main window.
 
 Choose **Update and restart** when a newer release is available. GROUT verifies the EXE against the exact release SHA-256 checksum, prepares a helper, closes the running instance, replaces its EXE and relaunches it. Library and settings remain intact. Protected folders may need a manual update; no silent elevation is attempted.
 

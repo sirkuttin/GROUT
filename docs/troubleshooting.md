@@ -27,7 +27,7 @@ Check the visible status and App settings. Common reasons include:
 - The release check failed or the source is in a rate-limit/access pause.
 - No unambiguous Windows asset matches the saved download choice.
 
-If an asset was renamed, select the correct download again. **Show all downloads** can expose unusual filenames. A successful version read does not prove all files are current, especially after a partial ZIP update.
+If an asset was renamed, select the correct download again. **Show all downloads** can expose unusual filenames. A successful version read does not prove all files are current, including files omitted from a release archive.
 
 ## No usable release or download is shown
 
@@ -49,6 +49,10 @@ GROUT attempts rollback if file application fails. Completed operations do not k
 
 Download cancellation leaves destination files unchanged. Once application begins, it completes or attempts rollback rather than cancelling midway through writes.
 
+## ZIP files or settings were overwritten
+
+ZIP installs and updates apply every archive file directly, including matching settings/save files. There is no conflict-review screen. Files not present in the archive remain unchanged, and the archive folder structure is preserved. Temporary rollback is internal and completed updates do not retain backups.
+
 ## Notifications or startup do not behave as expected
 
 - Closing the window keeps GROUT in the tray; **Exit** stops checks.
@@ -58,7 +62,7 @@ Download cancellation leaves destination files unchanged. Once application begin
 
 ## GROUT does not update itself
 
-Use **Check GROUT updates** to retry. Only newer stable releases with the expected Windows x64 EXE and checksum file are offered. Previews and older versions are not installed.
+Use **Check GROUT updates**, beside **Settings** at the bottom right, to retry. Only newer stable releases with the expected Windows x64 EXE and checksum file are offered. Previews and older versions are not installed.
 
 Version 0.4.x needs a manual upgrade to 0.5.0 first. Keep the EXE in a permanent writable folder; protected locations may require manual replacement. Self-updates require no GitHub CLI or authentication.
 
