@@ -11,10 +11,20 @@ public static class SettingsWindow
         var window = Ui.Window("GROUT settings", 640, 560); window.Owner = owner;
         var panel = Ui.Panel(window);
         panel.Children.Add(Ui.Text("Settings", 28));
+        panel.Children.Add(Ui.Text("G.R.O.U.T. " + SelfUpdater.CurrentLabel + " · MIT license", muted: true));
+        panel.Children.Add(Ui.Button("Licenses and third-party notices", (_, _) =>
+        {
+            var licenses = Ui.Window("GROUT licenses", 780, 650); licenses.Owner = window;
+            var assembly = typeof(SettingsWindow).Assembly;
+            var text = string.Join("\n\n", assembly.GetManifestResourceNames().Where(n => n.Contains(".Licenses.")).OrderBy(n => n).Select(n => { using var stream = assembly.GetManifestResourceStream(n)!; using var reader = new System.IO.StreamReader(stream); return n + "\n\n" + reader.ReadToEnd(); }));
+            licenses.Content = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(20) };
+            licenses.ShowDialog();
+        }));
         panel.Children.Add(Ui.Text("Check for app updates"));
         var hours = new[] { 0, 1, 6, 24 };
         var frequency = Ui.Choice(["Manual only", "Every hour", "Every 6 hours", "Every day"], Array.IndexOf(hours, preferences.CheckHours)); panel.Children.Add(frequency);
         var quiet = Ui.Check("Quiet mode — no update notifications", preferences.Quiet); panel.Children.Add(quiet);
+        var selfUpdates = Ui.Check("Check for GROUT updates automatically (daily)", preferences.SelfUpdateChecks); panel.Children.Add(selfUpdates);
         var startup = Ui.Check("Start GROUT with Windows", Preferences.StartsWithWindows()); panel.Children.Add(startup);
         panel.Children.Add(Ui.Text("Closing the window keeps GROUT in the tray. Right-click its tray icon and choose Exit to stop checks. Notifications follow Windows notification and Do Not Disturb settings. Startup opens in the tray.", muted: true));
         panel.Children.Add(Ui.Text("Keep the app in a permanent folder before enabling Windows startup. Moving the executable requires saving this setting again.", muted: true));
@@ -26,6 +36,7 @@ public static class SettingsWindow
             {
                 var draft = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
                 draft.CheckHours = hours[frequency.SelectedIndex]; draft.Quiet = quiet.IsChecked == true;
+                draft.SelfUpdateChecks = selfUpdates.IsChecked == true;
                 var previousStartup = Preferences.StartupCommand();
                 try { draft.Save(); Preferences.SetStartup(startup.IsChecked == true); }
                 catch
@@ -34,7 +45,7 @@ public static class SettingsWindow
                     catch (Exception recovery) { throw new InvalidOperationException("Saving settings failed and restoring the previous settings also needs attention: " + recovery.Message); }
                     throw;
                 }
-                preferences.CheckHours = draft.CheckHours; preferences.Quiet = draft.Quiet; window.DialogResult = true;
+                preferences.CheckHours = draft.CheckHours; preferences.Quiet = draft.Quiet; preferences.SelfUpdateChecks = draft.SelfUpdateChecks; window.DialogResult = true;
             }
             catch (Exception ex) { error.Text = ex.Message; }
         })); panel.Children.Add(row);

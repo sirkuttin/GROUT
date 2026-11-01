@@ -1,6 +1,6 @@
 # G.R.O.U.T.
 
-**Git Release Observer & Update Tool** · Version 0.4.8
+**Git Release Observer & Update Tool** · Version 0.5.0 (development build)
 
 A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 portable build is a single `GROUT.exe` with .NET included. Download it and run it; no adjacent DLLs or separate .NET installation are required. Native runtime components are automatically extracted into the .NET runtime cache at launch. Close older versions before launching this one. Your existing library is retained.
 
@@ -156,7 +156,25 @@ dotnet tool run dotnet-script -- scripts/release.csx -- --version 0.4.8
 dotnet tool run dotnet-script -- scripts/release.csx -- --version 0.4.8 --notes releases/v0.4.8.md --publish
 ```
 
-The script validates the project version, requires a clean main branch and matching origin before publication, builds into a new isolated directory, enforces exactly one EXE, and runs the packaged self-tests. It writes distributable files under `outputs/releases/<version>/`, pushes main, uploads a draft release targeting the tested commit, verifies SHA-256 and size for all three assets, then publishes it as latest. Repository visibility is unchanged. Existing releases are never overwritten. If upload or verification fails, inspect the draft on GitHub before retrying; the script refuses to overwrite an existing release, including a draft. All options use flags; unknown or duplicate flags fail with usage. `--version` defaults to the project version, `--repo` to `sirkuttin/GROUT`, and `--notes` is mandatory for `--publish`.
+The script validates the project version, requires a clean main branch and matching origin before publication, builds into a new isolated directory, enforces exactly one EXE, and runs the packaged self-tests. It writes distributable files under `outputs/releases/<version>/`, pushes main, uploads a draft release targeting the tested commit, verifies SHA-256 and size for all four assets, then publishes it as latest. Repository visibility is unchanged. Existing releases are never overwritten. If upload or verification fails, inspect the draft on GitHub before retrying; the script refuses to overwrite an existing release, including a draft. All options use flags; unknown or duplicate flags fail with usage. `--version` defaults to the project version, `--repo` to `sirkuttin/GROUT`, and `--notes` is mandatory for `--publish`.
 
 New portable ZIP installations treat the chosen folder as a parent and automatically create an app-named subfolder (for example, choosing C:\Apps for Gram produces C:\Apps\Gram). The full extraction path is shown before confirmation. Future updates use that saved app folder. Existing app locations and ZIP update destinations are unchanged.
 
+
+## GROUT updates itself (0.5.0)
+
+GROUT checks its own stable GitHub releases on startup and daily while running. This is separate from the schedule for tracked apps and can be turned off in Settings. **Check GROUT updates** performs a manual check; **Update and restart** appears when a newer stable Windows x64 EXE and its checksum file are available.
+
+After confirmation, GROUT downloads the new EXE, verifies its SHA-256 against the exact release checksum, starts an update helper, then closes itself. The helper waits for the running instance to exit, replaces the same executable path and restarts it. Library, preferences and startup path remain intact. The helper checks that it is replacing the actual parent process's EXE and preflights write access before asking it to exit. Replacement or immediate launch errors attempt rollback; failures leave recovery details and an alert. No silent elevation is attempted: protected folders may require manual updating.
+
+The updater uses the public `sirkuttin/GROUT` GitHub releases API and requires no credentials or GitHub CLI. It excludes previews and downgrades. The initial upgrade from 0.4.x must be downloaded manually because those builds do not contain the updater. Download-only mode is not used for GROUT's own updater.
+
+Temporary update payloads are removed after successful restart. If a restart or repair is interrupted, its workspace may remain under `%LOCALAPPDATA%\ReleaseDock\self-update` for troubleshooting. Native .NET extraction cache behavior is unchanged.
+
+`GROUT.exe --check-self-update REPORT_PATH` checks the public endpoint without installing anything or changing the library. Automated self-tests exercise real replacement/restart using isolated executable copies and a temporary update workspace; they never replace the user's running GROUT executable or load their app library.
+
+## License and security
+
+GROUT is [MIT licensed](LICENSE). The EXE embeds the GROUT license and the bundled .NET runtime's license/notices; Settings provides a viewer. Release packaging also attaches a combined licenses file. The notices in `licenses/` come from the .NET 10.0.14 runtime packs and should be reviewed when updating the bundled runtime.
+
+See [SECURITY.md](SECURITY.md) for private vulnerability reporting. Downloads are currently unsigned; code signing remains a follow-up for wider distribution.

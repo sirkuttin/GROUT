@@ -12,6 +12,9 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<TrackedApp> apps = [];
     private readonly ReleaseClient github = new();
+    private readonly SelfUpdater selfUpdater = new();
+    private SelfRelease? selfRelease;
+    private bool selfChecking;
     private readonly Store store;
     private readonly string preferencesPath;
     private Preferences preferences = new();
@@ -59,9 +62,9 @@ public partial class MainWindow : Window
                 SafePersist();
             }
         };
-        Closed += (_, _) => { timer.Stop(); if (tray != null) { tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Dispose(); tray = null; } github.Dispose(); };
+        Closed += (_, _) => { timer.Stop(); if (tray != null) { tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Dispose(); tray = null; } github.Dispose(); selfUpdater.Dispose(); };
         Activated += (_, _) => { if (!busy && OwnedWindows.Count == 0) ReconcileAll(); };
-        timer.Tick += async (_, _) => { if (busy || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); RenderSchedule(); };
+        timer.Tick += async (_, _) => { if (busy || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); await CheckSelf(false); RenderSchedule(); };
         timer.Start();
         Loaded += async (_, _) =>
         {
@@ -69,11 +72,61 @@ public partial class MainWindow : Window
             ReconcileAll(); Render();
             if (startHidden) Hide();
             if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false);
+            await CheckSelf(false);
         };
         Application.Current.SessionEnding += (_, _) => { exiting = true; };
         Render();
     }
     private void ShowMain() { Show(); WindowState = WindowState.Normal; Activate(); }
+    private async Task CheckSelf(bool manual)
+    {
+        if (busy || selfChecking || preview || OwnedWindows.Count > 0) return;
+        if (!manual && (!preferences.SelfUpdateChecks || preferences.SelfUpdateLastAttempt is { } last && DateTimeOffset.UtcNow - last < TimeSpan.FromDays(1))) return;
+        selfChecking = true; preferences.SelfUpdateLastAttempt = DateTimeOffset.UtcNow; SelfUpdateLabel.Text = "Checking GROUT updates…"; Render();
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            selfRelease = await selfUpdater.Check(timeout.Token);
+            InstallSelfButton.Visibility = selfRelease != null ? Visibility.Visible : Visibility.Collapsed;
+            SelfUpdateLabel.Text = selfRelease != null ? $"GROUT {selfRelease.Version} is available" : $"GROUT {SelfUpdater.CurrentLabel} · No newer release";
+            if (!manual && selfRelease != null && preferences.SelfUpdateNotifiedTag != selfRelease.Tag)
+            {
+                if (!preferences.Quiet) tray?.ShowBalloonTip(8000, "GROUT update available", $"GROUT {selfRelease.Version} is ready. Open GROUT to update and restart.", Forms.ToolTipIcon.Info);
+                preferences.SelfUpdateNotifiedTag = selfRelease.Tag;
+            }
+        }
+        catch (Exception ex) { selfRelease = null; InstallSelfButton.Visibility = Visibility.Collapsed; SelfUpdateLabel.Text = "GROUT update check failed · Try again"; if (manual) StatusLabel.Text = ex is OperationCanceledException ? "GROUT update check timed out." : ex.Message; }
+        finally { selfChecking = false; SafePersist(); Render(); }
+    }
+    private async void CheckSelf_Click(object sender, RoutedEventArgs e) => await CheckSelf(true);
+    private async void InstallSelf_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || selfChecking || selfRelease is not { } release || OwnedWindows.Count > 0 || preview) return;
+        if (MessageBox.Show(this, $"Update GROUT from {SelfUpdater.CurrentLabel} to {release.Version} and restart?\n\nThe verified GitHub release will replace:\n{Environment.ProcessPath}\n\nYour library and settings will be preserved.", "Update GROUT", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        busy = true; operation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        var folder = AppPaths.NewWork("self-update"); Process? helper = null;
+        Progress.IsIndeterminate = true; Progress.Visibility = CancelDownload.Visibility = Visibility.Visible; Render();
+        try
+        {
+            StatusLabel.Text = "Downloading and verifying GROUT update…";
+            var package = await selfUpdater.Download(release, folder, operation.Token);
+            CancelDownload.IsEnabled = false;
+            StatusLabel.Text = "Preparing GROUT restart…";
+            helper = await SelfUpdateHandoff.Start(package.Path, package.Hash, folder);
+            SafePersist(); StopWindow(); Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            if (helper != null) { try { helper.Kill(); await helper.WaitForExitAsync(); } catch { } }
+            StorageCleanup.DeleteFolder(folder, SelfUpdateHandoff.WorkRoot);
+            StatusLabel.Text = ex is OperationCanceledException ? "GROUT update cancelled. Your current version is unchanged." : "GROUT update stopped: " + ex.Message;
+        }
+        finally
+        {
+            helper?.Dispose(); operation?.Dispose(); operation = null; busy = false;
+            Progress.IsIndeterminate = false; Progress.Visibility = CancelDownload.Visibility = Visibility.Collapsed; CancelDownload.IsEnabled = true; Render();
+        }
+    }
     private void Quit()
     {
         if (busy || OwnedWindows.Count > 0) { ShowMain(); MessageBox.Show(this, "Finish the current operation or close the open dialog before exiting.", "GROUT"); return; }
@@ -92,6 +145,8 @@ public partial class MainWindow : Window
     private void Render()
     {
         var app = Current;
+        CheckSelfButton.IsEnabled = InstallSelfButton.IsEnabled = !busy && !selfChecking;
+        if (SelfUpdateLabel.Text.Length == 0) SelfUpdateLabel.Text = "GROUT " + SelfUpdater.CurrentLabel;
         CountLabel.Text = $"{apps.Count} app(s) · {apps.Count(a => a.CanUpdate && ReleaseFiles.Match(a) != null)} update(s) ready";
         AddAppButton.IsEnabled = AppSettingsButton.IsEnabled = SettingsButton.IsEnabled = CheckButton.IsEnabled = !busy;
         VersionSection.IsEnabled = UninstallButton.IsEnabled = RecoveryButton.IsEnabled = RemoveButton.IsEnabled = !busy;

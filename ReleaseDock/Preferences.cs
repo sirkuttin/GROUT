@@ -18,6 +18,9 @@ public sealed class Preferences
 {
     public int CheckHours { get; set; } = 24;
     public bool Quiet { get; set; }
+    public bool SelfUpdateChecks { get; set; } = true;
+    public DateTimeOffset? SelfUpdateLastAttempt { get; set; }
+    public string SelfUpdateNotifiedTag { get; set; } = "";
     public bool TrayExplained { get; set; }
     public DateTimeOffset? LastAttempt { get; set; }
     public DateTimeOffset? LastSuccess { get; set; }

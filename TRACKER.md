@@ -173,3 +173,13 @@
 - User authorized changing sirkuttin/GROUT to public. Inspected tracked file inventory/history for credential patterns and app-library data; no credential patterns or tracked personal app data found. Historical README includes a sample local Windows username path. Added clear release/download and early-release instructions, then changed visibility and verified public status.
 - Decision: user selected A, MIT license. Added LICENSE naming Kirk Sutton as copyright holder. Self-updater remains in progress and is not included in the existing public 0.4.8 release.
 
+
+## 2026-10-31 — Public self-updater, 0.5.0
+- Original task: use GROUT's own GitHub releases to update itself. Added independent daily/at-startup checks, manual Check GROUT updates, and confirmed Update and restart. Exact stable EXE and checksum assets are required; older/pre-release versions are excluded. Public API access needs no credentials now that repository visibility is public.
+- Helper verifies the staged payload and parent process identity, checks write access before GROUT exits, waits for exit, atomically replaces the EXE and relaunches it. Temporary rollback protects replacement/immediate launch failures; successful restart cleans payloads. Failure details remain for repair. User asked to close the running instance: implemented for GROUT itself; external third-party apps are not forcibly closed.
+- Public preparation: MIT license added per user decision; formatted license, embedded own/runtime notices, license viewer and release licenses attachment, public download guidance, SECURITY.md and enabled private vulnerability reporting. Prior release0.4.8 remains latest until a new release is explicitly published.
+- Packaged test suite includes metadata/version selection, checksum/corruption and replacement/rollback assertions plus a real helper handoff/restart smoke test against isolated executable copies.
+
+
+- Final verification: packaged suite passed with 22 self-update assertions, including real restart. Anonymous public check reported no newer stable release than development0.5.0; public repository visibility and enabled private vulnerability reporting verified. License/notices embedded and release-script licensing attachment generated. No 0.5.0 GitHub release was published in this task.
+

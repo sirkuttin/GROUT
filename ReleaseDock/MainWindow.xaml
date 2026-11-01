@@ -35,7 +35,7 @@
     </StackPanel></ScrollViewer>
    </Border>
   </Grid>
-  <StackPanel Grid.Row="2" Margin="0,20,0,0"><ProgressBar x:Name="Progress" Height="4" Minimum="0" Maximum="100" Visibility="Collapsed" Margin="0,0,0,10"/><Button x:Name="CancelDownload" Content="Cancel download" Click="Cancel_Click" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+  <StackPanel Grid.Row="2" Margin="0,20,0,0"><WrapPanel Margin="0,0,0,10"><TextBlock x:Name="SelfUpdateLabel" VerticalAlignment="Center" Foreground="#A4B4C9" Margin="0,0,12,0"/><Button x:Name="CheckSelfButton" Content="Check GROUT updates" Click="CheckSelf_Click"/><Button x:Name="InstallSelfButton" Content="Update and restart" Click="InstallSelf_Click" Visibility="Collapsed" Background="#267E70"/></WrapPanel><ProgressBar x:Name="Progress" Height="4" Minimum="0" Maximum="100" Visibility="Collapsed" Margin="0,0,0,10"/><Button x:Name="CancelDownload" Content="Cancel download" Click="Cancel_Click" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,10"/>
    <DockPanel><Button x:Name="SettingsButton" DockPanel.Dock="Right" Content="Settings" Click="Settings_Click"/><StackPanel><TextBlock x:Name="ScheduleLabel" Foreground="#A4B4C9" TextWrapping="Wrap"/><TextBlock x:Name="StatusLabel" Foreground="#A4B4C9" TextWrapping="Wrap" Margin="0,6,12,0"/></StackPanel></DockPanel>
   </StackPanel>
  </Grid>

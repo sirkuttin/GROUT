@@ -12,8 +12,34 @@ public partial class App : Application
     {
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        if (e.Args.Length > 0 && e.Args is not ["--tray"])
+        if (e.Args is ["--self-update-test-host", var testRoot])
         {
+            try { await SelfUpdateTests.TestHost(testRoot); Shutdown(0); } catch { Shutdown(1); } return;
+        }
+        if (e.Args is ["--apply-self-update", "--plan", var applyPlan]) { Shutdown(await SelfUpdateHandoff.Apply(applyPlan)); return; }
+        var selfRestart = e.Args is ["--finish-self-update", "--plan", _, "--helper-pid", _];
+        if (selfRestart)
+        {
+            try
+            {
+                if (!int.TryParse(e.Args[4], out var helperPid)) throw new IOException("Invalid update helper PID.");
+                var completed = SelfUpdateHandoff.Finish(e.Args[2], helperPid);
+                if (completed.TestReport.Length > 0)
+                {
+                    SelfUpdateTests.ValidateTestRoot(Path.GetDirectoryName(completed.Target)!);
+                    if (completed.TestReport != Path.Combine(Path.GetDirectoryName(completed.Target)!, "restarted.txt")) throw new IOException("Invalid smoke-test report.");
+                    File.WriteAllText(completed.TestReport + ".tmp", "PASS: replacement restarted\n" + Environment.ProcessId); File.Move(completed.TestReport + ".tmp", completed.TestReport); Shutdown(0); return;
+                }
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message, "GROUT update restart"); Shutdown(1); return; }
+        }
+        if (e.Args.Length > 0 && e.Args is not ["--tray"] && !selfRestart)
+        {
+            if (e.Args is ["--check-self-update", var selfReport])
+            {
+                try { using var updater = new SelfUpdater(); using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)); var latest = await updater.Check(timeout.Token); File.WriteAllText(selfReport, latest != null ? $"GROUT {latest.Version} available\n{latest.Page}" : $"GROUT {SelfUpdater.CurrentLabel}: no newer stable release."); Shutdown(0); }
+                catch (Exception ex) { File.WriteAllText(selfReport, ex.ToString()); Shutdown(1); } return;
+            }
             if (e.Args is ["--find-installation", var project, var discoveryReport])
             {
                 try { var candidates = new InstallDiscovery().Find(new TrackedApp { Repo = Repositories.Parse(project) }); File.WriteAllText(discoveryReport, candidates.Count > 0 ? string.Join("\n\n", candidates.Select(c => c.Label)) : "No matching registered installation found."); Shutdown(0); }
@@ -40,7 +66,7 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {SelfUpdateTests.Assertions} self-update, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }
@@ -108,7 +134,7 @@ public partial class App : Application
                 owner.Close(); Shutdown(); return;
             }
             var help = e.Args is ["--help"] or ["-h"];
-            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --preview-files PNG_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
+            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --preview-files PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
             Shutdown(help ? 0 : 2); return;
         }
         instance = new Mutex(true, @"Local\ReleaseDock-" + Environment.UserName, out var first);

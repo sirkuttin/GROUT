@@ -99,7 +99,8 @@ try
     if (!File.Exists(exe) || Directory.GetFiles(build).Length != 1 || Directory.GetDirectories(build).Length != 0) throw new Exception("Publish must contain exactly GROUT.exe.");
     var report = Path.Combine(build, "TEST-RESULTS.txt");
     Console.WriteLine("Running packaged regression tests…");
-    await Run(exe, "--self-test", report);
+    try { await Run(exe, "--self-test", report); }
+    catch { throw new Exception(File.Exists(report) ? "Packaged tests failed:\n" + File.ReadAllText(report) : "Packaged tests failed without a report. Build directory: " + build); }
     if (!File.Exists(report) || !File.ReadAllText(report).StartsWith("PASS:")) throw new Exception("Packaged self-tests did not pass.");
     Console.WriteLine(File.ReadAllText(report));
     var output = Path.Combine(root.FullName, "outputs", "releases", version); Directory.CreateDirectory(output);
@@ -108,13 +109,15 @@ try
     var tests = Path.Combine(output, "GROUT-" + version + "-TEST-RESULTS.txt"); File.Copy(report, tests, true);
     string hash; using (var stream = File.OpenRead(asset)) hash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     var checksums = Path.Combine(output, "GROUT-" + version + "-SHA256SUMS.txt"); File.WriteAllText(checksums, hash + "  " + assetName + "\n");
+    var licenses = Path.Combine(output, "GROUT-" + version + "-LICENSES.txt");
+    File.WriteAllText(licenses, File.ReadAllText(Path.Combine(root.FullName, "LICENSE")) + "\n\n" + string.Join("\n\n", Directory.GetFiles(Path.Combine(root.FullName, "licenses"), "*.txt").OrderBy(p => p).Select(p => Path.GetFileName(p) + "\n\n" + File.ReadAllText(p))));
     if (!publish) { Console.WriteLine("Verified local artifacts: " + output + "\nNothing pushed or published."); return; }
     if (await Run("git", "rev-parse", "HEAD") != commit || (await Run("git", "status", "--porcelain")).Length > 0) throw new Exception("Checkout changed during build; publication stopped.");
     Console.WriteLine("Pushing main and uploading draft release assets…");
     await Run("git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "push", "origin", "main");
-    await Run("gh", "release", "create", tag, asset, checksums, tests, "--repo", repo, "--target", commit, "--title", "G.R.O.U.T. " + version, "--notes-file", notes, "--draft");
+    await Run("gh", "release", "create", tag, asset, checksums, tests, licenses, "--repo", repo, "--target", commit, "--title", "G.R.O.U.T. " + version, "--notes-file", notes, "--draft");
     using var release = JsonDocument.Parse(await Run("gh", "release", "view", tag, "--repo", repo, "--json", "assets"));
-    var expected = new[] { asset, checksums, tests };
+    var expected = new[] { asset, checksums, tests, licenses };
     foreach (var file in expected)
     {
         var remote = release.RootElement.GetProperty("assets").EnumerateArray().Single(a => a.GetProperty("name").GetString() == Path.GetFileName(file));
