@@ -13,7 +13,7 @@ public static class AppUninstall
         if (protectedPaths.Any(p => !string.IsNullOrEmpty(p) && string.Equals(path, p.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) || path.Equals(windows, StringComparison.OrdinalIgnoreCase) || path.StartsWith(windows + "\\", StringComparison.OrdinalIgnoreCase) || new[] { "apps", "programs", "downloads", "documents", "desktop" }.Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
             throw new InvalidOperationException("This is a system or shared folder. Select the specific app's folder before uninstalling.");
         if (!Directory.Exists(path)) throw new DirectoryNotFoundException("App folder was not found.");
-        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidOperationException("The app folder is a link. Remove it manually from Explorer.");
+        FileUpdates.NoLinks(path);
         return path;
     }
     public static ProcessStartInfo Command(string command)
@@ -26,18 +26,27 @@ public static class AppUninstall
         if (Path.GetFileName(exe).Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase))
         {
             exe = Path.Combine(Environment.SystemDirectory, "msiexec.exe");
-            args = Regex.Replace(args, @"(?i)(^|\s)/i(?=\s|\{)", "$1/X");
+            args = Regex.Replace(args, @"(?i)(^|\s)/i(?=\s|\{|"")", "$1/X");
         }
         else if (!Path.IsPathFullyQualified(exe) || !File.Exists(exe)) throw new InvalidOperationException("The registered uninstaller could not be found. Use Windows Installed apps.");
         return new ProcessStartInfo(exe, args) { UseShellExecute = true };
     }
     public static InstalledRegistration? Registered(TrackedApp app, IEnumerable<InstalledRegistration> entries)
     {
-        var folder = AppLocationDraft.From(app).Folder.TrimEnd('\\', '/');
+        var draft = AppLocationDraft.From(app);
+        var folder = draft.Folder.TrimEnd('\\', '/');
         if (!Path.IsPathFullyQualified(folder)) return null;
+        static string Normalize(string value) => Regex.Replace(value.ToLowerInvariant(), "[^a-z0-9]", "");
+        static bool SamePath(string a, string b)
+        {
+            try { return Path.IsPathFullyQualified(a) && Path.IsPathFullyQualified(b) && Path.GetFullPath(a).TrimEnd('\\', '/').Equals(Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase); }
+            catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException) { return false; }
+        }
+        var knownExe = draft.FileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.Combine(folder, draft.FileName) : "";
+        var identities = new[] { Normalize(app.Repo.Length > 0 ? Repositories.Resolve(app.Repo).Path.Split('/').Last() : ""), Normalize(app.AppName) }.Where(n => n.Length >= 3).ToList();
         var matches = entries.Where(e => e.Uninstall.Length > 0 &&
-            (string.Equals(Environment.ExpandEnvironmentVariables(e.Location.Trim().Trim('"')).TrimEnd('\\', '/'), folder, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(Path.GetDirectoryName(InstallDiscovery.ExePath(e.Icon))?.TrimEnd('\\', '/'), folder, StringComparison.OrdinalIgnoreCase)))
+            (SamePath(Environment.ExpandEnvironmentVariables(e.Location.Trim().Trim('"')), folder) || SamePath(Path.GetDirectoryName(InstallDiscovery.ExePath(e.Icon)) ?? "", folder)) &&
+            (knownExe.Length > 0 ? SamePath(InstallDiscovery.ExePath(e.Icon), knownExe) : identities.Contains(Normalize(e.Name)) || identities.Contains(Normalize(Path.GetFileNameWithoutExtension(InstallDiscovery.ExePath(e.Icon))))))
             .GroupBy(e => e.Uninstall, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
         return matches.Count == 1 ? matches[0] : null;
     }

@@ -1,3 +1,5 @@
+<img src="ReleaseDock/Assets/GROUT.svg" alt="GROUT app icon" width="72" align="right">
+
 # G.R.O.U.T.
 
 **Git Release Observer & Update Tool**
@@ -6,7 +8,7 @@ The updater your apps are missing.
 
 Great apps on Git repositories do not always include an updater. GROUT fills that gap on Windows: track apps you already have, or install new ones from releases on **GitHub, Codeberg.org and GitLab.com**.
 
-**[Download for Windows x64](https://github.com/sirkuttin/GROUT/releases/latest)** · [User guide](docs/user-guide.md) · [Report a bug](https://github.com/sirkuttin/GROUT/issues)
+**[Download GROUT.exe for Windows x64](https://github.com/sirkuttin/GROUT/releases/latest)** · [User guide](docs/user-guide.md) · [Report a bug](https://github.com/sirkuttin/GROUT/issues)
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
@@ -23,7 +25,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 ## Get started
 
-1. Download the EXE from the [latest release](https://github.com/sirkuttin/GROUT/releases/latest), save it in a permanent writable folder, and run it.
+1. Download **GROUT.exe** from the [latest release](https://github.com/sirkuttin/GROUT/releases/latest), save it in a permanent writable folder, and run it.
 2. Choose **Add App**, paste a supported repository or release link, then choose to track an existing app or install it.
 3. Choose the Windows download and how updates should work. GROUT shows the destination before applying file updates.
 

@@ -20,6 +20,14 @@ public static class FeatureTests
         public int Calls;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) { Calls++; return Task.FromResult(respond()); }
     }
+    private sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public long BytesRead;
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var count = await base.ReadAsync(buffer, cancellationToken); BytesRead += count; return count;
+        }
+    }
     private sealed class CancellingStream(Action cancel) : Stream
     {
         public override bool CanRead => true;
@@ -108,6 +116,14 @@ public static class FeatureTests
                 catch (OperationCanceledException) { }
                 Check(File.ReadAllText(cancelledDestination) == "original" && Directory.GetFiles(root, "*.partial").Length == 0, "Mid-download cancellation cleans partial and preserves destination");
             }
+            var oversizedBody = new CountingStream(new byte[1024 * 1024]);
+            using (var overrun = new ReleaseClient(new Handler(() => new(HttpStatusCode.OK) { Content = new StreamContent(oversizedBody) })))
+            {
+                try { await overrun.Download(new("app.exe", "https://github.com/a/b/releases/download/v2/app.exe", 1, null), cancelledDestination, new Progress<double>(), CancellationToken.None); throw new Exception("Oversized stream accepted"); }
+                catch (IOException) { Assertions++; }
+                Check(oversizedBody.BytesRead < 1024 * 1024, "Declared-size overrun stops streaming immediately rather than consuming entire response");
+                Check(File.ReadAllText(cancelledDestination) == "original" && Directory.GetFiles(root, "*.partial").Length == 0, "Oversized response preserves destination and removes partial payload");
+            }
             File.WriteAllText(Path.Combine(destination, "app.exe"), "old");
             File.WriteAllText(Path.Combine(destination, "settings.ini"), "my settings");
             File.WriteAllText(Path.Combine(destination, "keep.txt"), "absent from zip");
@@ -149,16 +165,75 @@ public static class FeatureTests
             };
             Fails(() => FileUpdates.Apply(broken, destination, Path.Combine(root, "rollback-backup")), "Failed second write must roll back");
             Check(File.ReadAllText(Path.Combine(destination, "app.exe")) == "old", "Rollback restored first applied file");
+            var raceRoot = Path.Combine(root, "concurrent-destination"); Directory.CreateDirectory(raceRoot);
+            var raceSource = Path.Combine(root, "race-large-source.bin"); File.WriteAllBytes(raceSource, new byte[32 * 1024 * 1024]);
+            var raceSecondSource = Path.Combine(root, "race-second-source.bin"); File.WriteAllText(raceSecondSource, "archive payload");
+            var raceFirst = Path.Combine(raceRoot, "first.bin"); File.WriteAllText(raceFirst, "old first");
+            var raceSecond = Path.Combine(raceRoot, "second.bin");
+            using (var raceCreated = new ManualResetEventSlim())
+            using (var watcher = new FileSystemWatcher(raceRoot, "first.bin.releasedock-*") { EnableRaisingEvents = true })
+            {
+                var created = 0;
+                watcher.Created += (_, _) =>
+                {
+                    if (Interlocked.Exchange(ref created, 1) != 0) return;
+                    File.WriteAllText(raceSecond, "concurrent user data"); raceCreated.Set();
+                };
+                var racePlan = new List<UpdateFile>
+                {
+                    new() { Source = raceSource, Target = raceFirst, Relative = "first.bin" },
+                    new() { Source = raceSecondSource, Target = raceSecond, Relative = "second.bin" }
+                };
+                Fails(() => FileUpdates.Apply(racePlan, raceRoot, Path.Combine(root, "race-backup")), "A destination appearing after backup must stop application rather than be overwritten");
+                Check(raceCreated.Wait(TimeSpan.FromSeconds(2)) && File.ReadAllText(raceSecond) == "concurrent user data", "Concurrent destination data remains intact");
+                Check(File.ReadAllText(raceFirst) == "old first" && !Directory.GetFiles(raceRoot, "*.releasedock-*").Any(), "Earlier replacement rolls back and temporary files are removed after a concurrent destination appears");
+            }
             foreach (var bad in new[] { "../escape.txt", "/root.txt", "a/../../escape", "a\\..\\evil", "C:/evil", "NUL.txt", "dir/file.", "file:stream" })
                 Fails(() => FileUpdates.SafeRelative(bad), "Unsafe archive name accepted: " + bad);
             Fails(() => FileUpdates.StageZip(Zip("traversal.zip", ("../escape.txt", "bad")), Path.Combine(root, "bad-stage")), "Zip traversal accepted");
             Fails(() => FileUpdates.StageZip(Zip("duplicates.zip", ("App.exe", "one"), ("app.exe", "two")), Path.Combine(root, "dup-stage")), "Case-insensitive duplicate accepted");
             Fails(() => FileUpdates.StageZip(Zip("collision.zip", ("folder", "file"), ("folder/child", "child")), Path.Combine(root, "collision-stage")), "File/directory collision accepted");
+            foreach (var corruptSize in new[] { false, true })
+            {
+                var corruptArchive = Zip(corruptSize ? "wrong-entry-length.zip" : "wrong-entry-crc.zip", ("app.bin", new string('x', 1024)));
+                var corruptBytes = File.ReadAllBytes(corruptArchive);
+                for (var offset = 0; offset < corruptBytes.Length - 46; offset++)
+                {
+                    if (BitConverter.ToUInt32(corruptBytes, offset) != 0x02014B50) continue;
+                    if (corruptSize) BitConverter.GetBytes((uint)1).CopyTo(corruptBytes, offset + 24);
+                    else corruptBytes[offset + 16] ^= 1;
+                    break;
+                }
+                File.WriteAllBytes(corruptArchive, corruptBytes);
+                Fails(() => FileUpdates.StageZip(corruptArchive, Path.Combine(root, corruptSize ? "bad-length-stage" : "bad-crc-stage")), "Corrupt ZIP length/CRC must be rejected before update review");
+            }
             var linkZip = Path.Combine(root, "link.zip");
             using (var zip = ZipFile.Open(linkZip, ZipArchiveMode.Create)) { var entry = zip.CreateEntry("link"); entry.ExternalAttributes = unchecked((int)0xA1FF0000); }
             Fails(() => FileUpdates.StageZip(linkZip, Path.Combine(root, "link-stage")), "Archive symlink accepted");
             var traversalPlan = new List<UpdateFile> { new() { Relative = "../outside", Target = Path.Combine(root, "outside"), Source = archive } };
             Fails(() => FileUpdates.Apply(traversalPlan, destination, Path.Combine(root, "outside-backup")), "Out-of-root update target accepted");
+            var peFixture = Path.Combine(root, "fixture.exe");
+            File.WriteAllBytes(peFixture, PortableExeFixture.Bytes());
+            UpdateRunner.ValidatePortableExe(peFixture);
+            Check(true, "Valid native PE without version metadata is accepted");
+            foreach (var invalidExe in new[] { Array.Empty<byte>(), "not an executable"u8.ToArray(), PortableExeFixture.Bytes()[..600] })
+            {
+                File.WriteAllBytes(peFixture, invalidExe);
+                Fails(() => UpdateRunner.ValidatePortableExe(peFixture), "Empty, non-PE and truncated PE must be rejected");
+            }
+            var invalidTarget = Path.Combine(destination, "existing-portable.exe");
+            File.WriteAllText(invalidTarget, "working original");
+            var invalidApp = new TrackedApp { Repo = "test/app", Installed = "v1", Latest = "v2", UpdateMethod = "ReplaceExe", UpdateTarget = invalidTarget };
+            using (var invalidClient = new ReleaseClient(new Handler(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) })))
+            {
+                try
+                {
+                    await UpdateRunner.Run(null!, invalidApp, new Asset("empty.exe", "https://github.com/test/app/releases/download/v2/empty.exe", 0, null), invalidClient, (_, _) => { }, () => { }, newWork: category => { var folder = Path.Combine(root, "invalid-update", category); Directory.CreateDirectory(folder); return folder; });
+                    throw new Exception("Invalid portable payload should not complete");
+                }
+                catch (IOException) { Assertions++; }
+            }
+            Check(File.ReadAllText(invalidTarget) == "working original" && invalidApp.Installed == "v1" && invalidApp.LastBackup == "", "Invalid EXE never replaces working app, marks release installed or allocates backup");
             var replace = new List<UpdateFile> { new() { Relative = "app.exe", Target = Path.Combine(destination, "app.exe"), Source = Path.Combine(staging, "App-2.0", "app.exe") } };
             var exeBackup = FileUpdates.Apply(replace, destination, Path.Combine(root, "exe-backup"));
             Check(File.ReadAllText(Path.Combine(destination, "app.exe")) == "new", "Standalone EXE replacement"); FileUpdates.Restore(exeBackup);

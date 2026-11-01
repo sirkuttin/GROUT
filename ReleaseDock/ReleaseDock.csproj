@@ -6,9 +6,11 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Version>0.5.0</Version>
+    <Version>0.5.1</Version>
+    <ApplicationIcon>Assets/GROUT.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="Assets/GROUT.ico" />
     <EmbeddedResource Include="../LICENSE" Link="Licenses/GROUT-LICENSE.txt" />
     <EmbeddedResource Include="../licenses/*.txt" Link="Licenses/%(Filename)%(Extension)" />
   </ItemGroup>

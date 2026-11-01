@@ -79,3 +79,14 @@ Documentation [screenshots](images/) come from these previews. Use sample paths 
 The release script cleans its successful temporary EXE/test report after copying verified outputs. Failed builds stay under `work/` for diagnosis.
 
 GROUT is [MIT licensed](../LICENSE). Runtime files in [licenses/](../licenses/) are embedded in the EXE and included with release artifacts. They came from the .NET 10.0.14 runtime packs; review them when updating the bundled runtime.
+
+## App icon
+
+The SVG, PNG and multi-size ICO live in `ReleaseDock/Assets/`. The ICO is embedded in the executable, app windows and tray. Regenerate on Windows from the checkout root with the repository's script runner:
+
+```powershell
+dotnet tool run dotnet-script -- scripts/create-icon.csx -- --help
+dotnet tool run dotnet-script -- scripts/create-icon.csx
+```
+
+The generator uses pinned `System.Drawing.Common` tooling and emits 16, 24, 32, 48, 64, 128 and 256 pixel ICO entries. `--output FOLDER` changes the destination; unknown flags fail with usage.

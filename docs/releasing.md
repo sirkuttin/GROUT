@@ -25,9 +25,10 @@ dotnet script .\release.csx -- --help
 dotnet tool run dotnet-script -- scripts/release.csx
 ```
 
-Without `--publish`, nothing is pushed or published. The script builds the project version, runs packaged regression tests and writes four assets under `outputs/releases/<version>/`:
+Without `--publish`, nothing is pushed or published. The script builds the project version, runs packaged regression tests and writes five assets under `outputs/releases/<version>/`:
 
-- `GROUT-<version>-win-x64.exe`
+- `GROUT.exe` — the normal Windows x64 download
+- `GROUT-<version>-win-x64.exe` — identical compatibility copy for older updaters
 - `GROUT-<version>-SHA256SUMS.txt`
 - `GROUT-<version>-TEST-RESULTS.txt`
 - `GROUT-<version>-LICENSES.txt`
@@ -48,7 +49,7 @@ dotnet tool run dotnet-script -- scripts/release.csx -- `
 
 This example assumes the project has already been changed to 0.5.1. Optional `--version` must match the project; it does not edit it.
 
-The script builds in a new directory, enforces single-EXE output and runs packaged tests. It pushes `main`, creates a draft release targeting the tested commit, uploads all four assets and verifies their SHA-256 digests and sizes. Only then does it publish as latest. Repository visibility is unchanged.
+The script builds in a new directory, enforces single-EXE output and runs packaged tests. It pushes `main`, creates a draft release targeting the tested commit, uploads all five assets and verifies their SHA-256 digests and sizes. Only then does it publish as latest. Repository visibility is unchanged.
 
 Existing releases are never overwritten, including drafts. If uploading or verification fails, inspect the draft on GitHub before retrying. Resolve or remove that incomplete draft deliberately; rerunning does not replace it automatically.
 
@@ -75,3 +76,5 @@ git push
 ```
 
 This does not create a release. Use `--publish` only when you intend to release a new version.
+
+Releases use the stable download filename GROUT.exe. Both EXE asset names share the same SHA-256; the compatibility asset lets 0.5.0 self-updaters reach newer releases. The script also validates that existing local/remote tags and the published tag resolve to the tested commit. Successful publication removes the redundant local compatibility EXE; GitHub retains it.

@@ -90,6 +90,7 @@ public static class UpdateRunner
         }
         else if (app.UpdateMethod == "ReplaceExe")
         {
+            ValidatePortableExe(path);
             var target = Path.GetFullPath(app.UpdateTarget);
             var plan = new List<UpdateFile> { new() { Source = path, Target = target, Relative = Path.GetFileName(target), Existed = File.Exists(target) } };
             if ((!newInstall || File.Exists(target)) && !prompts.ReviewFiles(owner, plan, null, app.UpdateTarget)) return UpdateOutcome.Deferred;
@@ -119,6 +120,33 @@ public static class UpdateRunner
         if (app.UpdateMethod == "Installer" && app.InstallDiscoveryNote.Length > 0) app.UpdateState += "\n" + app.InstallDiscoveryNote;
         persist(); status(app.UpdateState, 100);
         return app.UpdateMethod == "Installer" ? UpdateOutcome.InstallerReturned : UpdateOutcome.FilesApplied;
+    }
+    public static void ValidatePortableExe(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var reader = new System.Reflection.PortableExecutable.PEReader(stream);
+            var headers = reader.PEHeaders;
+            var pe = headers.PEHeader;
+            var flags = headers.CoffHeader.Characteristics;
+            if (pe == null || (flags & System.Reflection.PortableExecutable.Characteristics.ExecutableImage) == 0 ||
+                (flags & System.Reflection.PortableExecutable.Characteristics.Dll) != 0 || headers.SectionHeaders.Length == 0)
+                throw new BadImageFormatException();
+            var entryMapped = false;
+            foreach (var section in headers.SectionHeaders)
+            {
+                if (section.PointerToRawData < 0 || section.SizeOfRawData < 0 || (long)section.PointerToRawData + section.SizeOfRawData > stream.Length)
+                    throw new BadImageFormatException();
+                var offset = (long)pe.AddressOfEntryPoint - section.VirtualAddress;
+                if (offset >= 0 && offset < section.SizeOfRawData) entryMapped = true;
+            }
+            if (!entryMapped) throw new BadImageFormatException();
+        }
+        catch (BadImageFormatException ex)
+        {
+            throw new IOException("The downloaded file is not a complete Windows executable. The installed app has not been replaced.", ex);
+        }
     }
     public static bool Review(Window owner, List<UpdateFile> files, string? staging, string target)
     {

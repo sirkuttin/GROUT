@@ -28,6 +28,8 @@ public partial class App : Application
                 {
                     SelfUpdateTests.ValidateTestRoot(Path.GetDirectoryName(completed.Target)!);
                     if (completed.TestReport != Path.Combine(Path.GetDirectoryName(completed.Target)!, "restarted.txt")) throw new IOException("Invalid smoke-test report.");
+                    if (completed.TestFailStartup) { Shutdown(1); return; }
+                    SelfUpdateHandoff.ConfirmStarted(e.Args[2], helperPid);
                     File.WriteAllText(completed.TestReport + ".tmp", "PASS: replacement restarted\n" + Environment.ProcessId); File.Move(completed.TestReport + ".tmp", completed.TestReport); Shutdown(0); return;
                 }
             }
@@ -140,7 +142,13 @@ public partial class App : Application
         instance = new Mutex(true, @"Local\ReleaseDock-" + Environment.UserName, out var first);
         if (!first) { MessageBox.Show("GROUT is already running. Open it from the Windows tray.", "GROUT"); Shutdown(); return; }
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        new MainWindow(startHidden: e.Args is ["--tray"]).Show();
+        var main = new MainWindow(startHidden: e.Args is ["--tray"]); main.Show();
+        if (selfRestart)
+        {
+            await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            if (main.IsEnabled && main.IsLoaded) SelfUpdateHandoff.ConfirmStarted(e.Args[2], int.Parse(e.Args[4]));
+            else Shutdown(1);
+        }
     }
     private static void SavePreview(Window window, string output)
     {

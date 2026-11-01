@@ -1,17 +1,25 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace ReleaseDock;
 
 public static class Ui
 {
+    public static ImageSource AppIcon { get; } = BitmapFrame.Create(new Uri("pack://application:,,,/Assets/GROUT.ico"));
+    public static System.Drawing.Icon LoadTrayIcon()
+    {
+        using var stream = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/GROUT.ico"))!.Stream;
+        using var icon = new System.Drawing.Icon(stream);
+        return (System.Drawing.Icon)icon.Clone();
+    }
     public static readonly Brush Muted = new SolidColorBrush(Color.FromRgb(164, 180, 201));
     public static Window Window(string title, double width = 700, double height = 720)
     {
         var window = new Window { Title = title, Width = width, Height = height, MinWidth = 550, MinHeight = 500,
             Background = new SolidColorBrush(Color.FromRgb(12, 20, 34)), Foreground = Brushes.White,
-            FontFamily = new FontFamily("Segoe UI"), FontSize = 14, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            FontFamily = new FontFamily("Segoe UI"), FontSize = 14, WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = AppIcon };
         ConstrainToScreen(window); return window;
     }
     public static void ConstrainToScreen(Window window)

@@ -94,7 +94,7 @@ Notifications announce new app/release tags once. **Quiet mode** suppresses them
 
 GROUT checks this repository's stable releases on startup and daily, separately from the tracked-app schedule. Turn this off with **Check for GROUT updates automatically (daily)** in Settings, or use **Check GROUT updates** manually.
 
-Choose **Update and restart** when a newer release is available. GROUT verifies the EXE against the exact release SHA-256 checksum, prepares a helper, closes the running instance, replaces the same EXE path and relaunches it. Library and settings remain intact. Protected folders may need a manual update; no silent elevation is attempted.
+Choose **Update and restart** when a newer release is available. GROUT verifies the EXE against the exact release SHA-256 checksum, prepares a helper, closes the running instance, replaces its EXE and relaunches it. Library and settings remain intact. Protected folders may need a manual update; no silent elevation is attempted.
 
 Self-updates require no credentials or GitHub CLI. Previews and downgrades are excluded. Version 0.4.x needs one manual upgrade to 0.5.0 because it does not contain the self-updater.
 
@@ -129,3 +129,11 @@ GROUT retains its original data-folder name for compatibility:
 Back up `apps.json` and `settings.json` to preserve configuration. Cleanup also removes obsolete files from older builds; locked files can wait for a later pass.
 
 The single EXE includes .NET. Native runtime components extract automatically into the .NET runtime cache at launch, separately from GROUT's data folder.
+
+### Stable executable name
+
+Download **GROUT.exe**. Its filename stays the same as the installed version changes. The version is shown inside GROUT and in the file properties.
+
+The first self-update from an older `GROUT-<version>-win-x64.exe` installation moves it to `GROUT.exe` in the same folder. Matching startup, desktop, Start menu and taskbar shortcut entries are repaired after the new app confirms healthy startup; then the old EXE is removed. Custom shortcuts elsewhere may need updating manually. If another GROUT.exe already exists in the folder, the update stops before closing the old instance and leaves both files unchanged.
+
+A separately labeled versioned release asset is an identical compatibility copy for older self-updaters. Choose GROUT.exe for a new download.

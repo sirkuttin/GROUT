@@ -3,6 +3,29 @@ using System.Text.Json;
 namespace ReleaseDock;
 public static class StorageCleanup
 {
+    private static List<string> InstallationPaths(IEnumerable<TrackedApp> apps)
+    {
+        var paths = new List<string>();
+        void Add(string path)
+        {
+            try { if (path.Length > 0) paths.Add(Path.GetFullPath(path).TrimEnd('\\', '/')); }
+            catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException) { }
+        }
+        foreach (var app in apps)
+        {
+            Add(app.InstallLocation); Add(app.AppFolder); Add(app.UpdateTarget);
+            if (app.AppFolder.Length > 0 && app.AppFile.Length > 0) Add(Path.Combine(app.AppFolder, app.AppFile));
+            if (app.VersionSourceOverride.Length > 0) Add(Path.IsPathFullyQualified(app.VersionSourceOverride) ? app.VersionSourceOverride : Path.Combine(app.AppFolder, app.VersionSourceOverride));
+        }
+        return paths;
+    }
+    private static bool Overlaps(string folder, string installationPath)
+    {
+        folder = Path.GetFullPath(folder).TrimEnd('\\', '/');
+        return folder.Equals(installationPath, StringComparison.OrdinalIgnoreCase)
+            || installationPath.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || folder.StartsWith(installationPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
     public static void DeleteFolder(string path, string root)
     {
         try
@@ -34,11 +57,15 @@ public static class StorageCleanup
     {
         data ??= AppPaths.Data;
         var list = apps.ToList();
+        var installationPaths = InstallationPaths(list);
         foreach (var category in new[] { "downloads", "staging", "backups" })
         {
             var root = Path.Combine(data, category); if (!Directory.Exists(root) || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) continue;
             foreach (var folder in Directory.EnumerateDirectories(root))
             {
+                // Cache ownership does not override a saved live-app/version path.
+                // This also protects libraries created before destination checks existed.
+                if (installationPaths.Any(path => Overlaps(folder, path))) continue;
                 if (category == "downloads" && list.Any(a => !a.IsCurrent && Path.GetDirectoryName(a.DownloadedPath)?.Equals(folder, StringComparison.OrdinalIgnoreCase) == true)) continue;
                 if (category == "backups" && !SafeBackup(folder)) continue;
                 DeleteFolder(folder, root);

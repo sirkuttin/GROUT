@@ -36,6 +36,12 @@ public sealed record InstallationSnapshot(string Installed, bool AutoReconcile, 
 
 public static class FileUpdates
 {
+    private static readonly uint[] Crc32Table = Enumerable.Range(0, 256).Select(value =>
+    {
+        var crc = (uint)value;
+        for (var bit = 0; bit < 8; bit++) crc = (crc >> 1) ^ ((crc & 1) != 0 ? 0xEDB88320u : 0);
+        return crc;
+    }).ToArray();
     public static void NoLinks(string path)
     {
         for (var item = new DirectoryInfo(Path.GetFullPath(path)); item != null; item = item.Parent)
@@ -80,6 +86,7 @@ public static class FileUpdates
         var staging = stagingDirectory ?? AppPaths.NewWork("staging");
         Directory.CreateDirectory(staging);
         if (Directory.EnumerateFileSystemEntries(staging).Any()) throw new IOException("Staging directory must be empty.");
+        long extracted = 0;
         foreach (var file in files)
         {
             cancellation.ThrowIfCancellationRequested();
@@ -87,8 +94,16 @@ public static class FileUpdates
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             using var source = file.Entry.Open();
             using var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            var buffer = new byte[81920]; int read;
-            while ((read = source.Read(buffer)) > 0) { cancellation.ThrowIfCancellationRequested(); target.Write(buffer, 0, read); }
+            var buffer = new byte[81920]; int read; long entryBytes = 0; uint crc = 0xFFFFFFFF;
+            while ((read = source.Read(buffer)) > 0)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                entryBytes += read; extracted += read;
+                if (entryBytes > file.Entry.Length || extracted > 8L * 1024 * 1024 * 1024) throw new IOException("Archive extraction exceeded its declared size or the 8 GB limit.");
+                for (var i = 0; i < read; i++) crc = (crc >> 8) ^ Crc32Table[(crc ^ buffer[i]) & 0xFF];
+                target.Write(buffer, 0, read);
+            }
+            if (entryBytes != file.Entry.Length || ~crc != file.Entry.Crc32) throw new IOException("Archive entry size or checksum did not match: " + file.Path);
         }
         return staging;
     }
@@ -153,7 +168,7 @@ public static class FileUpdates
             {
                 NoLinks(file.Target);
                 Directory.CreateDirectory(Path.GetDirectoryName(file.Target)!);
-                AtomicCopy(file.Source, file.Target);
+                AtomicCopy(file.Source, file.Target, file.Existed);
                 applied.Add(file);
             }
             journal.State = "Applied"; Save();
@@ -166,10 +181,10 @@ public static class FileUpdates
             throw new IOException($"Update failed; changed files were restored. Close the app and retry.\n{ex.Message}\nBackup: {backup}", ex);
         }
     }
-    private static void AtomicCopy(string source, string target)
+    private static void AtomicCopy(string source, string target, bool overwrite = true)
     {
         var temp = target + ".releasedock-" + Guid.NewGuid().ToString("N");
-        try { File.Copy(source, temp, false); File.Move(temp, target, true); }
+        try { File.Copy(source, temp, false); File.Move(temp, target, overwrite); }
         finally { if (File.Exists(temp)) File.Delete(temp); }
     }
     private static void RestoreFiles(string backup, IEnumerable<UpdateFile> files)

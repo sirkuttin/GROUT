@@ -49,7 +49,7 @@ public sealed class SelfUpdater : IDisposable
         if (!Regex.IsMatch(tag, @"^v?\d+\.\d+\.\d+$") || !Version.TryParse(tag.TrimStart('v'), out var version)) throw new IOException("Release has an unsupported version tag.");
         var comparable = new Version(version.Major, version.Minor, version.Build, 0);
         if (comparable <= current) return null;
-        var name = $"GROUT-{version}-win-x64.exe"; var sum = $"GROUT-{version}-SHA256SUMS.txt";
+        var name = r.GetProperty("assets").EnumerateArray().Any(a => a.GetProperty("name").GetString() == "GROUT.exe" && a.GetProperty("state").GetString() == "uploaded") ? "GROUT.exe" : $"GROUT-{version}-win-x64.exe"; var sum = $"GROUT-{version}-SHA256SUMS.txt";
         long Asset(string filename) => r.GetProperty("assets").EnumerateArray().Where(a => a.GetProperty("name").GetString() == filename && a.GetProperty("state").GetString() == "uploaded").Select(a => a.GetProperty("id").GetInt64()).Single();
         var exe = Asset(name); var checksums = Asset(sum);
         if (exe <= 0 || checksums <= 0) throw new IOException("Release assets are not ready.");

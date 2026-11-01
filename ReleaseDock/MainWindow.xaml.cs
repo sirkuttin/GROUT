@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private Preferences preferences = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMinutes(1) };
     private Forms.NotifyIcon? tray;
+    private System.Drawing.Icon? trayIcon;
     private bool busy, exiting;
     private CancellationTokenSource? operation;
     private readonly bool preview;
@@ -46,7 +47,8 @@ public partial class MainWindow : Window
         menu.Items.Add("Check now", null, (_, _) => Dispatcher.InvokeAsync(async () => await CheckAll(true)));
         menu.Items.Add("Settings", null, (_, _) => Dispatcher.Invoke(() => { ShowMain(); Settings_Click(this, new()); }));
         menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(Quit));
-        tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Application, Text = "GROUT", Visible = true, ContextMenuStrip = menu };
+        trayIcon = Ui.LoadTrayIcon();
+        tray = new Forms.NotifyIcon { Icon = trayIcon, Text = "GROUT", Visible = true, ContextMenuStrip = menu };
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowMain);
         tray.BalloonTipClicked += (_, _) => Dispatcher.Invoke(ShowMain);
         Closing += (_, e) =>
@@ -62,7 +64,7 @@ public partial class MainWindow : Window
                 SafePersist();
             }
         };
-        Closed += (_, _) => { timer.Stop(); if (tray != null) { tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Dispose(); tray = null; } github.Dispose(); selfUpdater.Dispose(); };
+        Closed += (_, _) => { timer.Stop(); if (tray != null) { tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Dispose(); tray = null; } trayIcon?.Dispose(); trayIcon = null; github.Dispose(); selfUpdater.Dispose(); };
         Activated += (_, _) => { if (!busy && OwnedWindows.Count == 0) ReconcileAll(); };
         timer.Tick += async (_, _) => { if (busy || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); await CheckSelf(false); RenderSchedule(); };
         timer.Start();

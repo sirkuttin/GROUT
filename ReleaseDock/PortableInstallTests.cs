@@ -30,9 +30,9 @@ public static class PortableInstallTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var uri = request.RequestUri!;
-            if (uri.AbsolutePath.Contains("/releases/download/")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent("abc"u8.ToArray()) });
+            if (uri.AbsolutePath.Contains("/releases/download/")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(PortableExeFixture.Bytes()) });
             if (!uri.AbsolutePath.Contains("/releases")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"tag_name":"v1.2.12","html_url":"https://github.com/test/portable/releases/tag/v1.2.12","body":"","assets":[{"name":"CircuitLordVRModInstaller.exe","browser_download_url":"https://github.com/test/portable/releases/download/v1.2.12/App.exe","size":3}]}""") });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"tag_name":"v1.2.12","html_url":"https://github.com/test/portable/releases/tag/v1.2.12","body":"","assets":[{"name":"CircuitLordVRModInstaller.exe","browser_download_url":"https://github.com/test/portable/releases/download/v1.2.12/App.exe","size":1024}]}""") });
         }
     }
     private static async Task StartNew(SetupWindow window)
@@ -79,7 +79,7 @@ public static class PortableInstallTests
                 var target = Path.Combine(folder, "CircuitLordVRModInstaller.exe");
                 Check(window.Result.UpdateTarget == target && Button(window, "Save and add app").IsEnabled, "Folder derives exact EXE target and enables save");
                 Check(FinishDialog(window, "Save and add app") == true, "Actual portable save finishes dialog successfully");
-                Check(File.ReadAllText(target) == "abc" && reviewCalls == 0, "New EXE is saved without launching or unnecessary overwrite review");
+                Check(File.ReadAllBytes(target).SequenceEqual(PortableExeFixture.Bytes()) && reviewCalls == 0, "New EXE is saved without launching or unnecessary overwrite review");
                 Check(window.Result.Installed == "v1.2.12" && !window.Result.AutoReconcile && window.Result.IsCurrent, "EXE without metadata records applied release without false update");
                 Check(window.Result.InstalledProvenance.Contains("Saved from GitHub release"), "Applied-release tracking has explicit provenance");
                 var store = new Store(Path.Combine(root, "library", "apps.json")); store.Save([window.Result]);
@@ -100,7 +100,7 @@ public static class PortableInstallTests
                 Check(File.ReadAllText(target) == "original" && retry.Result.Installed == "", "Cancelled review does not install or mark release");
                 Check(Find<Button>(retry).Any(b => Equals(b.Content, "Save and add app")) && !Find<TextBlock>(retry).Any(t => t.Text == "Where is it installed?"), "Cancelled review stays on portable page with retry action");
                 allowReview = true;
-                Check(FinishDialog(retry, "Save and add app") == true && File.ReadAllText(target) == "abc", "Retry after cancelled review actually saves and completes");
+                Check(FinishDialog(retry, "Save and add app") == true && File.ReadAllBytes(target).SequenceEqual(PortableExeFixture.Bytes()), "Retry after cancelled review actually saves and completes");
             }
             finally { retry.Close(); }
             var declined = new SetupWindow(github, [], updatePrompts: prompts, newWork: Work);

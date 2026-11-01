@@ -140,6 +140,7 @@ public sealed class ReleaseClient : IDisposable
                 var buffer = new byte[81920]; long total = 0; int read;
                 while ((read = await source.ReadAsync(buffer, cancellation)) > 0)
                 {
+                    if (expectedSize.HasValue && read > expectedSize.Value - total) throw new IOException("Download exceeded the release or response metadata size.");
                     await target.WriteAsync(buffer.AsMemory(0, read), cancellation); total += read;
                     progress.Report(expectedSize > 0 ? Math.Min(100, total * 100d / expectedSize.Value) : 0);
                 }
