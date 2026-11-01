@@ -106,6 +106,17 @@ try
     if (!File.Exists(report) || !File.ReadAllText(report).StartsWith("PASS:")) throw new Exception("Packaged self-tests did not pass.");
     Console.WriteLine(File.ReadAllText(report));
     var output = Path.Combine(root.FullName, "outputs", "releases", version); Directory.CreateDirectory(output);
+    var existingExe = Path.Combine(output, "GROUT-" + version + "-win-x64.exe");
+    if (File.Exists(existingExe))
+    {
+        try { using var probe = new FileStream(existingExe, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
+        catch (IOException)
+        {
+            output = Path.Combine(output, "build-" + commit[..12] + "-" + Guid.NewGuid().ToString("N")[..8]);
+            Directory.CreateDirectory(output);
+            Console.WriteLine("Existing EXE is in use; writing to " + output);
+        }
+    }
     var assetName = "GROUT-" + version + "-win-x64.exe";
     var asset = Path.Combine(output, assetName); File.Copy(exe, asset, true);
     var tests = Path.Combine(output, "GROUT-" + version + "-TEST-RESULTS.txt"); File.Copy(report, tests, true);

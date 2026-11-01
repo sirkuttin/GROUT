@@ -189,3 +189,6 @@
 - Release script now removes only the temporary EXE/report created by a successful invocation and its empty directory, without recursive deletion. Failed builds remain for diagnosis. Local full suite passed and cleanup verified.
 - User asked why0.5.0 was not published; proceeding with publication through the release script.
 
+
+- Publication initially encountered the user's running local0.5.0 EXE locking the artifact path. Updated the release script to select a separate commit-named build subfolder when the existing output is locked, preserving the running app.
+

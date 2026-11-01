@@ -179,3 +179,6 @@ GROUT is [MIT licensed](LICENSE). The EXE embeds the GROUT license and the bundl
 
 See [SECURITY.md](SECURITY.md) for private vulnerability reporting. Downloads are currently unsigned; code signing remains a follow-up for wider distribution.
 Successful release-script runs remove their temporary published EXE and test report from work/ after copying verified artifacts to outputs/releases/<version>/. Failed builds stay available for troubleshooting. Git is the source archive; old packaged copies need not be retained locally once published.
+
+If a local release EXE is running, the release script writes the new artifacts to a separate build subfolder instead of overwriting or stopping that instance.
+
