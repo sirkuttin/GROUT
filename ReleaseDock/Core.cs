@@ -28,6 +28,7 @@ public sealed class TrackedApp
     public string LastNotifiedTag { get; set; } = "";
     public string LastBackup { get; set; } = "";
     public string UpdateState { get; set; } = "";
+    [JsonIgnore] public string UpdateIssue => UpdateState is "Installed version detected" or "Marked installed manually" or "Previous files restored" || UpdateState.StartsWith("Portable app saved from release ", StringComparison.Ordinal) || UpdateState.StartsWith("Kept in library.", StringComparison.Ordinal) ? "" : UpdateState;
     public string DownloadedPath { get; set; } = "";
     public string DownloadedTag { get; set; } = "";
     public string InstalledProvenance { get; set; } = "";

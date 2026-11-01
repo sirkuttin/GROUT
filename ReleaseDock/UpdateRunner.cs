@@ -114,7 +114,7 @@ public static class UpdateRunner
             app.UpdateState = "Files applied — installation not yet verified"; persist();
         }
         InstalledVersions.Reconcile(app);
-        app.UpdateState = app.PartialUpdate ? "Some app files were not applied. Version source reports " + (app.Installed.Length > 0 ? app.Installed : "unknown") + ". Review the files or confirm the result manually." : app.AutoReconcile && !app.LocalError && app.IsCurrent ? "Installed version detected" : "Installation not verified — recheck the version or mark it manually";
+        app.UpdateState = app.PartialUpdate ? "Some app files were not applied. Version source reports " + (app.Installed.Length > 0 ? app.Installed : "unknown") + ". Review the files or confirm the result manually." : app.AutoReconcile && !app.LocalError && app.IsCurrent ? "" : "Installation not verified — recheck the version or mark it manually";
         if (app.UpdateMethod == "Installer" && app.InstallDiscoveryNote.Length > 0) app.UpdateState += "\n" + app.InstallDiscoveryNote;
         persist(); status(app.UpdateState, 100);
         return app.UpdateMethod == "Installer" ? UpdateOutcome.InstallerReturned : UpdateOutcome.FilesApplied;

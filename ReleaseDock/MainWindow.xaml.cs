@@ -165,7 +165,8 @@ public partial class MainWindow : Window
         UpdateButton.IsEnabled = !busy && app?.CanUpdate == true && asset != null;
         UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose a release download in App settings." : "Apply the configured update method.";
         MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod) + (asset == null ? " · Choose a release file in App settings" : app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
-        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.UpdateState }.Where(s => s.Length > 0));
+        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.UpdateIssue }.Where(s => s.Length > 0));
+        UpdateStateLabel.Visibility = UpdateStateLabel.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         DownloadedButton.Visibility = app?.UpdateMethod == "Manual" && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
         AppFolderButton.Visibility = app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         AppFolderButton.IsEnabled = !busy && !missing && app != null && Directory.Exists(AppLocationDraft.From(app).Folder);
@@ -181,7 +182,7 @@ public partial class MainWindow : Window
         foreach (var app in apps)
         {
             InstalledVersions.Reconcile(app);
-            if (!app.UninstallPending && !app.LocalError && app.IsCurrent && !app.PartialUpdate && app.UpdateState.Length > 0) app.UpdateState = "Installed version detected";
+            if (app.UpdateState.Length > 0 && app.UpdateIssue.Length == 0) app.UpdateState = "";
         }
         CheckPendingUninstalls();
         SafePersist();
@@ -282,7 +283,7 @@ public partial class MainWindow : Window
     private void Mark_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app || app.Latest.Length == 0) return;
-        app.Installed = app.Latest; app.PartialUpdate = false; app.AutoReconcile = false; app.InstalledProvenance = "Manually marked installed"; app.LocalStatus = app.InstalledProvenance; app.UpdateState = "Marked installed manually"; SafePersist(); Render();
+        app.Installed = app.Latest; app.PartialUpdate = false; app.AutoReconcile = false; app.InstalledProvenance = "Manually marked installed"; app.LocalStatus = app.InstalledProvenance; app.UpdateState = ""; SafePersist(); Render();
     }
     private void SaveVersion_Click(object sender, RoutedEventArgs e)
     {
@@ -331,7 +332,7 @@ public partial class MainWindow : Window
             var previous = await Task.Run(() => FileUpdates.Restore(app.LastBackup));
             if (previous != null) previous.Apply(app);
             else { app.Installed = ""; app.InstalledProvenance = "Files restored; installed version is unknown. Check or enter it manually."; }
-            app.LastBackup = ""; app.UpdateState = "Previous files restored"; InstalledVersions.Reconcile(app); SafePersist();
+            app.LastBackup = ""; app.UpdateState = ""; InstalledVersions.Reconcile(app); SafePersist();
         }
         catch (Exception ex) { StatusLabel.Text = ex.Message; }
         finally { busy = false; Render(); }
@@ -379,7 +380,7 @@ public partial class MainWindow : Window
     private void KeepTracking_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { UninstallPending: true } app) return;
-        AppUninstall.KeepTracking(app); app.UpdateState = "Kept in library. This does not cancel a running Windows uninstaller.";
+        AppUninstall.KeepTracking(app); app.UpdateState = "";
         SafePersist(); Render();
     }
     private void Uninstall_Click(object sender, RoutedEventArgs e)

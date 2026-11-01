@@ -118,6 +118,6 @@ public static class InstalledVersions
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
         Reconcile(app);
-        app.UpdateState = "Portable app saved from release " + app.Latest;
+        app.UpdateState = "";
     }
 }

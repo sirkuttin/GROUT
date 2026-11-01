@@ -105,6 +105,13 @@ public static class FeatureTests
             var persisted = new Store(Path.Combine(root, "apps.json"));
             persisted.Save([tracked]);
             Check(persisted.Load()[0].Release?.Assets.Count == 3 && persisted.Load()[0].LastNotifiedTag == "v3", "Cached releases and notification dedup survive restart");
+            foreach (var success in new[] { "Installed version detected", "Portable app saved from release v1", "Marked installed manually", "Previous files restored" })
+            {
+                tracked.UpdateState = success;
+                Check(tracked.UpdateIssue.Length == 0, "Routine success messages do not appear as issues");
+            }
+            tracked.UpdateState = "Update stopped: access denied";
+            Check(tracked.UpdateIssue == tracked.UpdateState, "Actual update issues remain visible");
             tracked.Error = "Last check failed"; persisted.Save([tracked]);
             Check(tracked.DisplayStatus == "Update check failed" && tracked.StatusColor == "#F0D495", "Failed update checks show a warning on the app entry");
             Check(persisted.Load()[0].Error == "Last check failed" && !persisted.Load()[0].CanUpdate, "Failed-check state survives restart");

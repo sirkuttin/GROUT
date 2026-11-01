@@ -244,3 +244,7 @@
 ## 0.5.6 release
 - Header owns check progress/counts; app entries own failed-check warnings. Same-row footer, no generic added confirmation, inline link failures, missing-folder disablement and download-only file access.
 - Packaged tests cover sidebar warning state and stable footer layout. Broader footer routing remains planned, not implemented.
+
+## 0.5.7 release
+- Right-aligned sidebar statuses; removed routine success messages and suppressed persisted legacy success text. Empty selected-app message area collapses; real issues remain visible.
+- Full packaged regression suite includes success suppression and issue preservation checks.
