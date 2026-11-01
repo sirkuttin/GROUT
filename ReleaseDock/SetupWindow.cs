@@ -152,7 +152,7 @@ public sealed class SetupWindow : Window
         body.Children.Add(Ui.Text(editing ? "APP SETTINGS" : "ADD APP · 2 OF 2", 12, true));
         body.Children.Add(Ui.Text(Result.ProjectLabel, 26));
         body.Children.Add(Ui.Text("Latest release: " + (Result.Latest.Length > 0 ? Result.Latest : "unavailable"), muted: true));
-        var editor = new AppSettingsPage(this, Result); body.Children.Add(editor.Panel);
+        var editor = new AppSettingsPage(this, Result, allowRepositoryEdit: editing); body.Children.Add(editor.Panel);
         message = Ui.Text("", muted: true);
         var row = new WrapPanel();
         row.Children.Add(Ui.Button(editing ? "Cancel" : "← Back", (_, _) =>
@@ -160,10 +160,22 @@ public sealed class SetupWindow : Window
             try { if (editing) Close(); else { editor.Save(false); ScreenOne(); } }
             catch (Exception ex) { message.Text = ex.Message; }
         }));
-        row.Children.Add(Ui.Button(editing ? "Save settings" : "Add App", (_, _) =>
+        row.Children.Add(Ui.Button(editing ? "Save settings" : "Add App", async (_, _) =>
         {
-            try { editor.Save(); completed = true; DialogResult = true; }
+            if (working) return;
+            working = true; row.IsEnabled = false;
+            try
+            {
+                var source = editor.RepositoryKey;
+                if (editing && !source.Equals(Result.Repo, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (existing.Contains(source)) throw new InvalidOperationException("That repository is already tracked. Choose its existing library entry instead.");
+                    message.Text = "Checking the new repository…"; await github.VerifyRepository(source);
+                }
+                editor.Save(); working = false; completed = true; DialogResult = true;
+            }
             catch (Exception ex) { message.Text = ex.Message; }
+            finally { working = false; row.IsEnabled = true; }
         }));
         FixedFooter(row);
     }

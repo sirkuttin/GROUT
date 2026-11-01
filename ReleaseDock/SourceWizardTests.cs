@@ -30,6 +30,30 @@ public static class SourceWizardTests
     {
         Assertions = 0;
         var handler = new Handler(); using var client = new ReleaseClient(handler);
+        var original = new TrackedApp { Repo = "owner/old", CustomName = "My App", Installed = "v1", UpdateMethod = "Manual" };
+        var edit = new SetupWindow(client, [], edit: original) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
+        try
+        {
+            Find<TextBox>(edit).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Repository URL").Text = "https://codeberg.org/owner/new";
+            var requests = handler.Requests;
+            _ = edit.Dispatcher.InvokeAsync(() => Find<Button>(edit).Single(b => Equals(b.Content, "Save settings")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) }; timer.Tick += (_, _) => { timer.Stop(); edit.Close(); }; timer.Start();
+            try { Check(edit.ShowDialog() == true, "Repository migration saves through real modal flow"); } finally { timer.Stop(); }
+            Check(handler.Requests == requests + 1 && edit.Result.Repo == "https://codeberg.org/owner/new", "New provider verified before settings accepted");
+            Check(original.Repo == "owner/old" && edit.Result.CustomName == "My App", "Source editing preserves original until accepted and keeps explicit name");
+        }
+        finally { edit.Close(); }
+        var editDuplicate = new SetupWindow(client, ["https://codeberg.org/owner/new"], edit: original);
+        try
+        {
+            Find<TextBox>(editDuplicate).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Repository URL").Text = "https://codeberg.org/owner/new";
+            var requests = handler.Requests;
+            Find<Button>(editDuplicate).Single(b => Equals(b.Content, "Save settings")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Task.Delay(20);
+            Check(handler.Requests == requests && editDuplicate.Result.Repo == "owner/old", "Duplicate source rejected without network request or source mutation");
+            Check(Find<TextBlock>(editDuplicate).Any(t => t.Text.Contains("already tracked")), "Duplicate source explains recovery");
+        }
+        finally { editDuplicate.Close(); }
         foreach (var project in new[] { "https://codeberg.org/owner/app/releases", "https://gitlab.com/group/subgroup/app/-/releases" })
         {
             var window = new SetupWindow(client, []);

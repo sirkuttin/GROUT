@@ -12,7 +12,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*GROUT 0.5.0 with sample data.*
+*GROUT 0.5.2 with sample data.*
 
 ## What it does
 

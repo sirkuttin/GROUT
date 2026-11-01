@@ -10,9 +10,11 @@ namespace ReleaseDock;
 public sealed class TrackedApp
 {
     public string Repo { get; set; } = "";
+    [JsonIgnore] public string RepositoryUrl => Repo.Length > 0 ? Repositories.Resolve(Repo).WebUrl : "";
     public string CustomName { get; set; } = "";
     private string nameKey = "", suggestedName = "";
-    [JsonIgnore] public string AppName { get { if (!string.IsNullOrWhiteSpace(CustomName)) return CustomName.Trim(); var key = Repo + "|" + AppFolder + "|" + AppFile + "|" + InstallLocation + "|" + AssetName; if (key != nameKey) { nameKey = key; suggestedName = AppNames.Suggest(this); } return suggestedName; } }
+    internal void InvalidateSuggestedName() => nameKey = "";
+    [JsonIgnore] public string AppName { get { if (!string.IsNullOrWhiteSpace(CustomName)) return CustomName.Trim(); var key = Repo + "|" + AppFolder + "|" + AppFile + "|" + InstallLocation + "|" + UpdateTarget + "|" + AssetName; if (key != nameKey) { nameKey = key; suggestedName = AppNames.Suggest(this); } return suggestedName; } }
     [JsonIgnore] public string ProjectLabel { get { if (Repo.Length == 0) return ""; var source = Repositories.Resolve(Repo); return source.Path + (source.Host == "github.com" ? "" : " · " + source.Name); } }
     public string Installed { get; set; } = "";
     public string Latest { get; set; } = "";

@@ -17,13 +17,25 @@ public sealed class AppSettingsPage
     private readonly StackPanel filePanel, manualPanel;
     private readonly Window owner;
     private string checkedSource = "", checkedVersion = "", checkedFile = "";
+    private bool customName, updatingName;
+    private readonly TextBox? repository;
+    public string RepositoryKey => repository == null ? app.Repo : Repositories.Parse(repository.Text);
     public StackPanel Panel { get; } = new();
     private static void Name(DependencyObject control, string label) => System.Windows.Automation.AutomationProperties.SetName(control, label);
-    public AppSettingsPage(Window owner, TrackedApp app)
+    public AppSettingsPage(Window owner, TrackedApp app, bool allowRepositoryEdit = false)
     {
         this.owner = owner; this.app = app; draft = AppLocationDraft.From(app);
+        if (allowRepositoryEdit)
+        {
+            Panel.Children.Add(Ui.Text("Repository URL", 18));
+            repository = Ui.Input(app.RepositoryUrl); Name(repository, "Repository URL"); Panel.Children.Add(repository);
+            Panel.Children.Add(Ui.Text("Change this when the project moves. Installed files and version are kept; the new source is checked before saving. You may need to choose a new release download afterward.", muted: true));
+        }
         Panel.Children.Add(Ui.Text("App name", 18));
         appName = Ui.Input(app.AppName); Name(appName, "App name"); Panel.Children.Add(appName);
+        customName = !string.IsNullOrWhiteSpace(app.CustomName);
+        appName.TextChanged += (_, _) => { if (!updatingName) customName = !string.IsNullOrWhiteSpace(appName.Text); };
+        Panel.Children.Add(Ui.Button("Use detected name", (_, _) => { customName = false; Refresh(); }));
         Panel.Children.Add(Ui.Text("App folder", 18));
         folder = Ui.Input(draft.Folder); Name(folder, "App folder"); Panel.Children.Add(folder);
         Panel.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new OpenFolderDialog { Title = "Choose the app folder" }; if (picker.ShowDialog(owner) == true) folder.Text = picker.FolderName; }));
@@ -72,6 +84,12 @@ public sealed class AppSettingsPage
     private void Refresh()
     {
         ReadLocation(); filePanel.Visibility = Method == "ReplaceExe" || draft.FileName.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (!customName)
+        {
+            updatingName = true;
+            try { appName.Text = AppNames.Suggest(new TrackedApp { Repo = app.Repo, AppFolder = draft.Folder, AppFile = draft.FileName, InstallLocation = draft.Folder }); }
+            finally { updatingName = false; }
+        }
         manualPanel.Visibility = automatic.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
         sourceLabel.Text = "Version source: " + (draft.VersionSource.Length > 0 ? draft.VersionSource : "App location (not set)");
         detected.Text = automatic.IsChecked == true ? checkedSource == draft.VersionSource && checkedSource.Length > 0 ? checkedVersion + " · Automatic detection\nRead from " + Path.GetFileName(checkedFile) : "Not checked for this location · Automatic detection" : (manual.Text.Length > 0 ? manual.Text : "Unknown") + " · Manual tracking";
@@ -97,19 +115,29 @@ public sealed class AppSettingsPage
     }
     public void Save(bool validate = true)
     {
-        app.CustomName = appName.Text.Trim();
+        var source = RepositoryKey;
+        var sourceChanged = !source.Equals(app.Repo, StringComparison.OrdinalIgnoreCase);
+        app.CustomName = customName ? appName.Text.Trim() : "";
+        if (!customName) app.InvalidateSuggestedName();
         if (!validate) { CaptureDraft(); return; }
         ReadLocation(); draft.Apply(app, Method);
         app.AutoReconcile = automatic.IsChecked == true; app.IncludePrereleases = previews.IsChecked == true;
         if (app.Installed != manual.Text.Trim()) app.InstalledProvenance = "Manually entered installed version";
         app.Installed = manual.Text.Trim();
-        if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) { app.AssetName = asset.Name; if (validate) ReleaseFiles.Validate(app, asset); }
-        else if (validate && Method != "Manual") throw new InvalidOperationException("Choose a release download or use Download only.");
+        if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) { app.AssetName = asset.Name; if (validate && !sourceChanged) ReleaseFiles.Validate(app, asset); }
+        else if (validate && !sourceChanged && Method != "Manual") throw new InvalidOperationException("Choose a release download or use Download only.");
         InstalledVersions.Reconcile(app);
+        if (sourceChanged)
+        {
+            app.Repo = source; app.Release = null; app.Latest = ""; app.CheckedAt = null; app.Error = "";
+            app.AssetName = ""; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
+            app.UpdateState = "Repository changed — checking the new source";
+        }
     }
     public void CaptureDraft()
     {
-        app.CustomName = appName.Text.Trim();
+        app.CustomName = customName ? appName.Text.Trim() : "";
+        if (!customName) app.InvalidateSuggestedName();
         ReadLocation(); app.AppFolder = draft.Folder; app.AppFile = draft.FileName; app.VersionSourceOverride = draft.SourceOverride;
         app.PendingLocationConflict = draft.Conflict; app.UpdateMethod = Method;
         if (app.Installed != manual.Text.Trim()) app.InstalledProvenance = "Manually entered installed version";

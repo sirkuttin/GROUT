@@ -7,13 +7,22 @@ public static class AppNames
     public static string Suggest(TrackedApp app)
     {
         var draft = AppLocationDraft.From(app);
-        var path = draft.FileName.Length > 0 ? Path.Combine(draft.Folder, draft.FileName) : app.InstallLocation;
+        var path = draft.FileName.Length > 0 ? Path.Combine(draft.Folder, draft.FileName) : draft.Folder;
         try
         {
             if (Directory.Exists(path))
             {
                 var files = Directory.EnumerateFiles(path, "*.exe").Where(p => !Regex.IsMatch(Path.GetFileName(p), "unins|setup|install|update|crash", RegexOptions.IgnoreCase)).Take(2).ToList();
-                if (files.Count == 1) path = files[0];
+                if (files.Count == 1)
+                {
+                    static string Identity(string name) => Regex.Replace(name.ToLowerInvariant(), "[^a-z0-9]", "");
+                    var repoName = app.Repo.Length > 0 ? Identity(Repositories.Resolve(app.Repo).Path.Split('/').Last()) : "";
+                    var folderName = Identity(Path.GetFileName(Path.TrimEndingDirectorySeparator(path)));
+                    var info = FileVersionInfo.GetVersionInfo(files[0]);
+                    var identities = new[] { Identity(Path.GetFileNameWithoutExtension(files[0])), Identity(info.ProductName ?? ""), Identity(info.FileDescription ?? "") };
+                    // A shared parent with one unrelated EXE is not the app.
+                    if (identities.Any(n => n.Length > 0 && (n == repoName || n == folderName))) path = files[0];
+                }
             }
             if (File.Exists(path) && Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase))
             {

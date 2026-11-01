@@ -154,7 +154,7 @@ public partial class MainWindow : Window
         VersionSection.IsEnabled = UninstallButton.IsEnabled = RecoveryButton.IsEnabled = RemoveButton.IsEnabled = !busy;
         Details.Visibility = app == null ? Visibility.Collapsed : Visibility.Visible;
         AppTitle.Text = app?.AppName ?? "Bring your apps aboard.";
-        SourceLabel.Text = app?.ProjectLabel ?? "";
+        SourceLabel.Text = app?.RepositoryUrl ?? "";
         VersionLabel.Text = app?.Versions ?? "Choose Add App to track an existing installation or install something new from a supported release host.";
         StateLabel.Text = app?.DisplayStatus ?? "";
         var missing = app?.InstallationMissing == true;
@@ -230,7 +230,7 @@ public partial class MainWindow : Window
     private async void AppSettings_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app || preview) return;
-        var wizard = new SetupWindow(github, [], app) { Owner = this };
+        var wizard = new SetupWindow(github, apps.Where(a => a != app).Select(a => a.Repo), app) { Owner = this };
         if (wizard.ShowDialog() != true) return;
         var index = apps.IndexOf(app); apps[index] = wizard.Result; Library.SelectedItem = wizard.Result; busy = true;
         try { await Fetch(wizard.Result); SafePersist(); } finally { busy = false; Render(); }
@@ -303,6 +303,11 @@ public partial class MainWindow : Window
         finally { operation.Dispose(); operation = null; busy = false; Progress.IsIndeterminate = false; Progress.Visibility = Visibility.Collapsed; CancelDownload.Visibility = Visibility.Collapsed; Render(); }
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) => operation?.Cancel();
+    private void Repository_Click(object sender, RoutedEventArgs e)
+    {
+        if (Current is not { } app) return;
+        try { Process.Start(new ProcessStartInfo(app.RepositoryUrl) { UseShellExecute = true }); } catch (Exception ex) { StatusLabel.Text = ex.Message; }
+    }
     private void Release_Click(object sender, RoutedEventArgs e)
     {
         if (Current is not { } app) return;

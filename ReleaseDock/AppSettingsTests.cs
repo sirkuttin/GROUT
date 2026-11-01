@@ -25,6 +25,30 @@ public static class AppSettingsTests
         try
         {
             var exe = Path.Combine(root, "MultiverseVRHub.exe");
+            var shared = Path.Combine(root, "apps"); Directory.CreateDirectory(shared);
+            File.WriteAllBytes(Path.Combine(shared, "MultiverseVRHub.exe"), PortableExeFixture.Bytes());
+            var coderFolder = Path.Combine(shared, "coder"); Directory.CreateDirectory(coderFolder);
+            File.WriteAllBytes(Path.Combine(coderFolder, "Coder.exe"), PortableExeFixture.Bytes());
+            var naming = new TrackedApp { Repo = "coder/coder", InstallLocation = shared };
+            var namingPage = new AppSettingsPage(owner, naming);
+            Check(Input(namingPage, "App name").Text == "coder", "Shared parent cannot supply unrelated EXE name");
+            Input(namingPage, "App folder").Text = coderFolder;
+            Check(Input(namingPage, "App name").Text == "Coder", "Automatic name refreshes for new folder");
+            namingPage.Save(); Check(naming.CustomName == "" && naming.AppName == "Coder", "Suggested name not saved as explicit override");
+            Input(namingPage, "App name").Text = "My Coder"; Input(namingPage, "App folder").Text = shared; namingPage.Save();
+            Check(naming.CustomName == "My Coder", "Deliberate name survives location changes");
+            Input(namingPage, "App folder").Text = coderFolder;
+            Find<Button>(namingPage.Panel).Single(b => Equals(b.Content, "Use detected name")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            namingPage.Save(); Check(naming.CustomName == "" && naming.AppName == "Coder", "Detected-name action clears old override");
+            var movedSource = new AppSettingsPage(owner, naming, allowRepositoryEdit: true);
+            Check(Input(movedSource, "Repository URL").Text == "https://github.com/coder/coder", "Full canonical URL shown in settings");
+            naming.AssetName = "old.zip"; naming.Latest = "old"; naming.DownloadedPath = "old-cache";
+            Input(movedSource, "Repository URL").Text = "https://gitlab.com/group/subgroup/coder/-/releases"; movedSource.Save();
+            Check(naming.Repo == "https://gitlab.com/group/subgroup/coder" && naming.InstallLocation == coderFolder, "Cross-provider source move preserves install path");
+            Check(naming.AssetName == "" && naming.Latest == "" && naming.DownloadedPath == "", "Old source download/cache state cleared");
+            Input(movedSource, "Repository URL").Text = "https://untrusted.example/coder/coder";
+            try { movedSource.Save(); throw new Exception("Unsupported repository accepted"); } catch (ArgumentException) { Assertions++; }
+            Check(naming.Repo.StartsWith("https://gitlab.com/"), "Invalid source change preserves saved repository");
             var app = new TrackedApp { Repo = "test/app", Installed = "1.0.36.0", Latest = "hub-1.0.36", InstallLocation = exe, Release = new("hub-1.0.36", "", "", [new("MultiverseVRHub.exe", "", 3, null)]), AssetName = "MultiverseVRHub.exe" };
             var page = new AppSettingsPage(owner, app);
             Check(Input(page, "App name").Text == "MultiverseVRHub", "Settings suggest the installed EXE name");

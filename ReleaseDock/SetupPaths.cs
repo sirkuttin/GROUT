@@ -28,6 +28,7 @@ public static class SetupPaths
     public static void ClearExistingTracking(TrackedApp app)
     {
         app.Installed = ""; app.InstallLocation = ""; app.AutoReconcile = false;
+        app.AppFolder = ""; app.AppFile = ""; app.VersionSourceOverride = ""; app.InstallationMissing = false;
         app.LocalError = false; app.LocalStatus = ""; app.InstalledProvenance = "";
         app.UpdateTarget = ""; app.UpdateMethod = "Manual"; app.UpdateState = "";
         app.PendingLocationConflict = false;

@@ -62,6 +62,7 @@ Temporary rollback copies protect a file update while it is applied. Completed u
 
 ## Installed versions
 
+
 EXE detection reads `ProductVersion`, falling back to `FileVersion`, without executing the file. For a folder, GROUT tries:
 
 1. `release-manifest.json`
@@ -137,3 +138,9 @@ Download **GROUT.exe**. Its filename stays the same as the installed version cha
 The first self-update from an older `GROUT-<version>-win-x64.exe` installation moves it to `GROUT.exe` in the same folder. Matching startup, desktop, Start menu and taskbar shortcut entries are repaired after the new app confirms healthy startup; then the old EXE is removed. Custom shortcuts elsewhere may need updating manually. If another GROUT.exe already exists in the folder, the update stops before closing the old instance and leaves both files unchanged.
 
 A separately labeled versioned release asset is an identical compatibility copy for older self-updaters. Choose GROUT.exe for a new download.
+
+## App names and repository moves
+
+The selected app shows its full repository URL beneath its name; click it to open the project. In App settings, edit **Repository URL** if the project moves, including to another supported provider. GROUT verifies the new project and rejects duplicates before saving. Installed files, destination and installed version are retained, while the old source's release/download selection is cleared. Choose the appropriate download from the new source afterward.
+
+Suggested app names remain automatic and refresh when the install location changes. Typing a custom name makes it an explicit override. **Use detected name** clears the override and returns to the current app's name. A shared parent folder is not used to borrow an unrelated program's identity. Overrides saved by older versions are preserved until you reset them, so intentional custom names are not lost.
