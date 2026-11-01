@@ -1,6 +1,6 @@
 # G.R.O.U.T.
 
-**Git Release Observer & Update Tool** · Version 0.5.0 (development build)
+**Git Release Observer & Update Tool** · Version 0.5.0
 
 A native Windows app for keeping track of public app releases on **GitHub, Codeberg.org and GitLab.com**. The Windows x64 portable build is a single `GROUT.exe` with .NET included. Download it and run it; no adjacent DLLs or separate .NET installation are required. Native runtime components are automatically extracted into the .NET runtime cache at launch. Close older versions before launching this one. Your existing library is retained.
 
@@ -178,3 +178,4 @@ Temporary update payloads are removed after successful restart. If a restart or 
 GROUT is [MIT licensed](LICENSE). The EXE embeds the GROUT license and the bundled .NET runtime's license/notices; Settings provides a viewer. Release packaging also attaches a combined licenses file. The notices in `licenses/` come from the .NET 10.0.14 runtime packs and should be reviewed when updating the bundled runtime.
 
 See [SECURITY.md](SECURITY.md) for private vulnerability reporting. Downloads are currently unsigned; code signing remains a follow-up for wider distribution.
+Successful release-script runs remove their temporary published EXE and test report from work/ after copying verified artifacts to outputs/releases/<version>/. Failed builds stay available for troubleshooting. Git is the source archive; old packaged copies need not be retained locally once published.

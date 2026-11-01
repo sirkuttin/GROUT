@@ -183,3 +183,9 @@
 
 - Final verification: packaged suite passed with 22 self-update assertions, including real restart. Anonymous public check reported no newer stable release than development0.5.0; public repository visibility and enabled private vulnerability reporting verified. License/notices embedded and release-script licensing attachment generated. No 0.5.0 GitHub release was published in this task.
 
+
+## 2026-10-31 — Local artifact cleanup and 0.5.0 publication
+- User requested cleanup now that source is on GitHub. Old packages/source ZIPs, scratch builds and build intermediates totaled roughly4.8GB. Permanent deletion was blocked by automatic approval; moved54 verified untracked workspace items to Recycle Bin instead. Kept current0.5.0 verified outputs, review notes/screenshots and the small NuGet-config backup under ignored review/local-maintenance.
+- Release script now removes only the temporary EXE/report created by a successful invocation and its empty directory, without recursive deletion. Failed builds remain for diagnosis. Local full suite passed and cleanup verified.
+- User asked why0.5.0 was not published; proceeding with publication through the release script.
+

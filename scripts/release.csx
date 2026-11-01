@@ -42,6 +42,8 @@ REQUIREMENTS
 
 OUTPUT
   outputs/releases/<version>/ in the checkout.
+  Successful builds remove their temporary EXE and test report.
+  Failed builds remain under work/ for troubleshooting.
   Run from anywhere inside the checkout. Unknown or duplicate flags fail.
 ";
 async Task<string> Run(string command, params string[] arguments)
@@ -111,6 +113,17 @@ try
     var checksums = Path.Combine(output, "GROUT-" + version + "-SHA256SUMS.txt"); File.WriteAllText(checksums, hash + "  " + assetName + "\n");
     var licenses = Path.Combine(output, "GROUT-" + version + "-LICENSES.txt");
     File.WriteAllText(licenses, File.ReadAllText(Path.Combine(root.FullName, "LICENSE")) + "\n\n" + string.Join("\n\n", Directory.GetFiles(Path.Combine(root.FullName, "licenses"), "*.txt").OrderBy(p => p).Select(p => Path.GetFileName(p) + "\n\n" + File.ReadAllText(p))));
+    // Remove only the two files created by this successful invocation.
+    // Never recursively remove the work directory or other build artifacts.
+    try
+    {
+        var workRoot = Path.GetFullPath(Path.Combine(root.FullName, "work")) + Path.DirectorySeparatorChar;
+        if (!Path.GetFullPath(build).StartsWith(workRoot, StringComparison.OrdinalIgnoreCase) || (File.GetAttributes(build) & FileAttributes.ReparsePoint) != 0) throw new IOException("Unexpected build cleanup path.");
+        File.Delete(exe); File.Delete(report); Directory.Delete(build);
+        Console.WriteLine("Temporary build files cleaned.");
+    }
+    catch (IOException ex) { Console.WriteLine("Build cleanup deferred: " + ex.Message); }
+    catch (UnauthorizedAccessException ex) { Console.WriteLine("Build cleanup deferred: " + ex.Message); }
     if (!publish) { Console.WriteLine("Verified local artifacts: " + output + "\nNothing pushed or published."); return; }
     if (await Run("git", "rev-parse", "HEAD") != commit || (await Run("git", "status", "--porcelain")).Length > 0) throw new Exception("Checkout changed during build; publication stopped.");
     Console.WriteLine("Pushing main and uploading draft release assets…");
