@@ -168,3 +168,8 @@
 - User requested an app-named subfolder under the chosen ZIP install parent. New-install ZIP setup now labels the parent clearly, previews the computed child destination and uses it for extraction and future updates. Back navigation preserves the parent without appending another nested child. Existing app settings remain unchanged.
 - Folder names sanitize invalid Windows characters and reserved names. Packaged full regression suite passed via release.csx in local-only mode, including 6 ZIP destination checks and actual extraction into the created subfolder.
 
+
+## 2026-10-31 — Public repository and license
+- User authorized changing sirkuttin/GROUT to public. Inspected tracked file inventory/history for credential patterns and app-library data; no credential patterns or tracked personal app data found. Historical README includes a sample local Windows username path. Added clear release/download and early-release instructions, then changed visibility and verified public status.
+- Decision: user selected A, MIT license. Added LICENSE naming Kirk Sutton as copyright holder. Self-updater remains in progress and is not included in the existing public 0.4.8 release.
+
