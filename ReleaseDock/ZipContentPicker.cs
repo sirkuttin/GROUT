@@ -92,6 +92,7 @@ internal static class ZipContentPicker
                     use.Content = choice.Path.Length == 0 ? "Use entire ZIP" : choice.IsFile ? "Use this file" : "Use this folder";
                     explanation.Text = choice.Path.Length == 0 ? "Install the whole ZIP into the app folder." : choice.IsFile ? "Copy only " + choice.Path + " into the app folder as " + Path.GetFileName(choice.Path) + "." : "Install only the contents of " + choice.Path + "/ directly into the app folder.";
                     explanation.Text += " Future updates use this same selection.";
+                    if (InstalledVersions.UsesD2RLoaderManifest(app)) explanation.Text += " D2RLoader mod folders with a manifest are installed without their version suffix.";
                 }
                 tree.SelectedItemChanged += (_, _) => Selected(); content.Content = tree; Selected();
                 window.UpdateLayout(); ready?.Invoke(window);

@@ -82,7 +82,7 @@ public sealed class SetupWindow : Window
         BeginPage();
         body.Children.Add(Ui.Text("ADD APP · 1 OF 2", 12, true));
         body.Children.Add(Ui.Text("Find your app", 28));
-        body.Children.Add(Ui.Text(NexusMods.Enabled ? "Paste a GitHub, Codeberg, GitLab.com or Nexus Mods link." : "Paste a GitHub, Codeberg or GitLab.com project or release link.", muted: true));
+        body.Children.Add(Ui.Text(NexusMods.Enabled ? "Paste a GitHub, Codeberg, GitLab.com, D2RLoader or Nexus Mods link." : "Paste a GitHub, Codeberg, GitLab.com or D2RLoader link.", muted: true));
         repo.Text = Result.Repo; previews.IsChecked = Result.IncludePrereleases;
         body.Children.Add(Ui.Text("Project link")); body.Children.Add(repo); body.Children.Add(previews);
         projectInfo = Ui.Text("The project and latest release will appear here.", muted: true); body.Children.Add(projectInfo);
@@ -90,6 +90,7 @@ public sealed class SetupWindow : Window
         installed.IsChecked = !newInstall; fresh.IsChecked = newInstall;
         body.Children.Add(installed); body.Children.Add(fresh);
         message = Ui.Text("Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.", muted: true); body.Children.Add(message);
+        body.Children.Add(Ui.Button("Browse D2RLoader…", (_, _) => { var link = D2RLoaderBrowser.Show(this, github); if (link != null) repo.Text = link; }));
         nexusConnect = Ui.Button("Connect Nexus Mods…", (_, _) => { NexusSettings.Show(this); lookedUpRepo = verifiedRepo = ""; lookupTimer.Stop(); lookupTimer.Start(); });
         nexusConnect.Visibility = NexusMods.Enabled && repo.Text.IndexOf("nexusmods.com", StringComparison.OrdinalIgnoreCase) >= 0 ? Visibility.Visible : Visibility.Collapsed; body.Children.Add(nexusConnect);
         var row = new WrapPanel();
@@ -140,6 +141,8 @@ public sealed class SetupWindow : Window
                 Result.Release = release; Result.Latest = release.Tag; Result.CheckedAt = DateTimeOffset.UtcNow; Result.Error = "";
                 var source = Repositories.Resolve(parsed);
                 projectInfo.Text = $"{source.Name} · {source.Path}\nLatest: {release.Tag}\n{AssetCompatibility.Candidates(release.Assets).Count} Windows candidate download(s)" + (source.Host == "gitlab.com" ? "\nGitLab preview releases are identified by tags such as beta, rc or preview." : "");
+                if (source.Host == "d2rloader.net" && release.Notes.StartsWith("Requires D2RLoader", StringComparison.Ordinal)) projectInfo.Text += "\n" + release.Notes.Split('\n')[0];
+                if (release.SourceWarning.Length > 0) projectInfo.Text += "\n\n" + release.SourceWarning;
             }
             catch (Exception ex) { Result.Error = ex.Message; projectInfo.Text = parsed + "\n" + ex.Message + "\nYou can still track an existing installation manually."; }
             lookedUpRepo = parsed; lookedUpChannel = channel;
@@ -206,6 +209,7 @@ public sealed class SetupWindow : Window
         body.Children.Add(Ui.Text("ADD APP · 2 OF 2", 12, true));
         body.Children.Add(Ui.Text("Install " + Result.ProjectLabel, 26));
         body.Children.Add(Ui.Text("Release " + Result.Latest, muted: true));
+        if (Result.Release?.SourceWarning.Length > 0) { var warning = Ui.Text(Result.Release.SourceWarning); warning.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 212, 149)); body.Children.Add(warning); }
         body.Children.Add(Ui.Text("Download", 18));
         var files = AssetCompatibility.Candidates(Result.Release?.Assets ?? [], Result.ShowAllDownloads);
         assets = new ComboBox { Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 16) };
@@ -339,7 +343,7 @@ public sealed class SetupWindow : Window
                 if (outcome == UpdateOutcome.Deferred) { message.Text = "Nothing was installed or added. Your download is ready; you can retry."; return; }
                 if (outcome == UpdateOutcome.FilesApplied)
                 {
-                    if (selectedMethod == "Zip") { Result.InstallLocation = Result.UpdateTarget; Result.AutoReconcile = true; InstalledVersions.Reconcile(Result); }
+                    if (selectedMethod == "Zip") { if (Result.VersionSourceOverride.Length == 0) Result.InstallLocation = Result.UpdateTarget; Result.AutoReconcile = true; InstalledVersions.Reconcile(Result); }
                     working = false; completed = true; DialogResult = true; return;
                 }
                 if (outcome == UpdateOutcome.InstallerReturned && InstallDiscovery.CanFinish(Result))
@@ -408,7 +412,7 @@ public sealed class SetupWindow : Window
     }
     private void Detect()
     {
-        try { var found = InstalledVersions.Read(location.Text); version.Text = found.Version; detection.Text = $"Detected {found.Version}\nRead from {found.Source}"; automatic.IsChecked = true; }
+        try { var found = InstalledVersions.Read(location.Text, InstalledVersions.UsesD2RLoaderManifest(Result)); version.Text = found.Version; detection.Text = $"Detected {found.Version}\nRead from {found.Source}"; automatic.IsChecked = true; }
         catch (Exception ex) { detection.Text = ex.Message + " Enter a version manually or choose another source."; automatic.IsChecked = false; }
     }
     private void ReadForm()

@@ -124,7 +124,7 @@ public sealed class AppSettingsPage
     {
         Refresh();
         if (automatic.IsChecked != true && !force) return;
-        try { var found = InstalledVersions.Read(draft.VersionSource); checkedSource = draft.VersionSource; checkedVersion = found.Version; checkedFile = found.Source; app.Installed = found.Version; if (automatic.IsChecked != true) app.InstalledProvenance = "Version checked from " + found.Source; manual.Text = found.Version; detected.Text = found.Version + (automatic.IsChecked == true ? " · Automatic detection" : " · Checked now (manual tracking)") + "\nRead from " + Path.GetFileName(found.Source); }
+        try { var found = InstalledVersions.Read(draft.VersionSource, InstalledVersions.UsesD2RLoaderManifest(app)); checkedSource = draft.VersionSource; checkedVersion = found.Version; checkedFile = found.Source; app.Installed = found.Version; if (automatic.IsChecked != true) app.InstalledProvenance = "Version checked from " + found.Source; manual.Text = found.Version; detected.Text = found.Version + (automatic.IsChecked == true ? " · Automatic detection" : " · Checked now (manual tracking)") + "\nRead from " + Path.GetFileName(found.Source); }
         catch (Exception ex) { detected.Text = "Installed version unverified\n" + ex.Message; }
     }
     public void Save(bool validate = true)
@@ -145,7 +145,7 @@ public sealed class AppSettingsPage
         if (sourceChanged)
         {
             app.Repo = source; app.Release = null; app.Latest = ""; app.CheckedAt = null; app.Error = "";
-            app.AssetName = ""; app.NexusFileId = 0; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
+            app.AssetName = ""; app.NexusFileId = 0; app.D2RManagedFolder = ""; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
             app.UpdateState = "Repository changed — checking the new source";
         }
     }

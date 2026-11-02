@@ -28,6 +28,7 @@ public sealed class TrackedApp
     public string UpdateTarget { get; set; } = "";
     public string ZipSubfolder { get; set; } = "";
     public bool ZipSourceIsFile { get; set; }
+    public string D2RManagedFolder { get; set; } = "";
     public string LastNotifiedTag { get; set; } = "";
     public string LastBackup { get; set; } = "";
     public string UpdateState { get; set; } = "";
@@ -50,7 +51,7 @@ public sealed class TrackedApp
     [JsonIgnore] public string LocalStatus { get; set; } = "Manual version tracking";
     [JsonIgnore] public bool LocalError { get; set; }
     [JsonIgnore] public bool InstallationMissing { get; set; }
-    [JsonIgnore] public string StatusColor => UninstallPending || InstallationMissing || LocalError || Error.Length > 0 ? "#F0D495" : "#76DCC6";
+    [JsonIgnore] public string StatusColor => UninstallPending || InstallationMissing || LocalError || Error.Length > 0 || Release?.SourceWarning.Length > 0 ? "#F0D495" : "#76DCC6";
     public DateTimeOffset? CheckedAt { get; set; }
     public Release? Release { get; set; }
     public string Error { get; set; } = "";
@@ -62,7 +63,7 @@ public sealed class TrackedApp
     [JsonIgnore] public string DisplayStatus => CanUpdate && ReleaseFiles.Match(this) == null ? Release?.Assets.Any(a => Repositories.IsWindowsAsset(a.Name)) == true ? "Choose release download" : "No app downloads found" : Status;
 }
 public sealed record Asset(string Name, string Url, long Size, string? Digest, string? OriginHost = null, long FileId = 0, string Version = "");
-public sealed record Release(string Tag, string Url, string Notes, List<Asset> Assets, long SelectedFileId = 0, string Title = "");
+public sealed record Release(string Tag, string Url, string Notes, List<Asset> Assets, long SelectedFileId = 0, string Title = "", string SourceWarning = "");
 
 public sealed class Store(string path)
 {

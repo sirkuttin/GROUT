@@ -13,7 +13,7 @@ public sealed class ReleaseClient : IDisposable
     private readonly Dictionary<string, DateTimeOffset> backoffs = new(StringComparer.OrdinalIgnoreCase);
     public DateTimeOffset? RetryAfter => backoffs.Values.Where(t => t > DateTimeOffset.UtcNow).Select(t => (DateTimeOffset?)t).Min();
     public Dictionary<string, DateTimeOffset> Backoffs { get { if (Nexus.PausedUntil is { } pause) backoffs["nexusmods.com"] = pause; return backoffs.Where(p => p.Value > DateTimeOffset.UtcNow).ToDictionary(p => p.Key, p => p.Value); } }
-    public void RestoreBackoffs(Dictionary<string, DateTimeOffset> saved) { if (saved.TryGetValue("nexusmods.com", out var pause)) Nexus.PausedUntil = pause; foreach (var pair in saved.Where(p => p.Key is "github.com" or "codeberg.org" or "gitlab.com")) backoffs[pair.Key] = pair.Value; }
+    public void RestoreBackoffs(Dictionary<string, DateTimeOffset> saved) { if (saved.TryGetValue("nexusmods.com", out var pause)) Nexus.PausedUntil = pause; foreach (var pair in saved.Where(p => p.Key is "github.com" or "codeberg.org" or "gitlab.com" or "d2rloader.net")) backoffs[pair.Key] = pair.Value; }
     public ReleaseClient(HttpMessageHandler? handler = null, NexusMods? nexus = null)
     {
         Nexus = nexus ?? new NexusMods();
@@ -49,11 +49,19 @@ public sealed class ReleaseClient : IDisposable
         using var response = await Get(reference, reference.ApiUrl, timeout.Token);
         if (response.StatusCode == HttpStatusCode.NotFound) throw new InvalidOperationException($"{reference.Name} project not found. Check the link and public access.");
         response.EnsureSuccessStatusCode();
+        if (reference.Host == "d2rloader.net") { using var mod = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token)); D2RLoader.Validate(mod.RootElement); }
     }
     public async Task<Release> Latest(string repo, bool includePrereleases = false, long nexusFileId = 0)
     {
         var reference = Repositories.Resolve(repo);
         if (reference.Host == "nexusmods.com") return await Nexus.Latest(reference, nexusFileId);
+        if (reference.Host == "d2rloader.net")
+        {
+            using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var reply = await Get(reference, reference.ApiUrl, limit.Token); reply.EnsureSuccessStatusCode();
+            using var mod = JsonDocument.Parse(await reply.Content.ReadAsStringAsync(limit.Token));
+            return D2RLoader.Parse(reference, mod.RootElement, includePrereleases);
+        }
         if (reference.Host == "gitlab.com") return await LatestGitLab(reference, includePrereleases);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var endpoint = includePrereleases ? reference.Host == "codeberg.org" ? "/releases?limit=100" : "/releases?per_page=100" : "/releases/latest";
@@ -102,6 +110,15 @@ public sealed class ReleaseClient : IDisposable
         if (!Uri.TryCreate(web, UriKind.Absolute, out var webUri) || webUri.Scheme != "https" || webUri.Host != "gitlab.com") web = reference.ReleasesUrl + "/" + Uri.EscapeDataString(Text(release, "tag_name"));
         return new(Text(release, "tag_name"), web, Text(release, "description"), assets.GroupBy(a => a.Url).Select(g => g.First()).ToList());
     }
+    public async Task<D2RLoaderPage> D2RLoaderCatalog(int page, CancellationToken cancel = default, string query = "")
+    {
+        if (page < 1) throw new ArgumentOutOfRangeException(nameof(page));
+        query = query.Trim(); if (query.Length > 200) throw new ArgumentException("Search must be 200 characters or fewer.");
+        var source = new RepositoryRef("d2rloader.net", "hub/plugins");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel); timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var response = await Get(source, source.ApiUrl + "?sort=newest&type=both&page=" + page + (query.Length > 0 ? "&q=" + Uri.EscapeDataString(query) : ""), timeout.Token); response.EnsureSuccessStatusCode();
+        using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token)); return D2RLoader.ParsePage(data.RootElement);
+    }
     public static bool IsPreviewTag(string tag) => Regex.IsMatch(tag, @"(?:alpha|beta|preview|nightly|snapshot|rc|dev|pre)(?:[-_.]?\d+)?(?:$|[-_.])", RegexOptions.IgnoreCase);
     private static void ValidateUrl(Uri uri, string? metadataHost = null)
     {
@@ -131,7 +148,7 @@ public sealed class ReleaseClient : IDisposable
     public async Task Download(Asset asset, string destination, IProgress<double> progress, CancellationToken cancellation)
     {
         var downloadUrl = asset.OriginHost == "nexusmods.com" ? await Nexus.DownloadUrl(asset, cancellation) : asset.Url;
-        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0 || !uri.IsDefaultPort || (asset.OriginHost ?? "github.com") is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com") || (asset.OriginHost == null && uri.Host != "github.com")) throw new InvalidOperationException("Unexpected release download URL.");
+        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0 || !uri.IsDefaultPort || (asset.OriginHost ?? "github.com") is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com" or "d2rloader.net") || (asset.OriginHost == null && uri.Host != "github.com")) throw new InvalidOperationException("Unexpected release download URL.");
         var partial = destination + "." + Guid.NewGuid().ToString("N") + ".partial";
         try
         {

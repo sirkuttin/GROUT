@@ -9,20 +9,21 @@ public sealed record InstalledVersion(string Version, string Source);
 
 public static class InstalledVersions
 {
-    public static InstalledVersion Read(string location)
+    public static bool UsesD2RLoaderManifest(TrackedApp app) => app.Repo.Length > 0 && Repositories.Resolve(app.Repo).Host == "d2rloader.net";
+    public static InstalledVersion Read(string location, bool d2rLoader = false)
     {
         location = Path.GetFullPath(location.Trim().Trim('"'));
         if (Directory.Exists(location))
         {
-            foreach (var name in new[] { "release-manifest.json", "vrmod-manifest.json" })
+            foreach (var name in d2rLoader ? new[] { "manifest.json", "release-manifest.json", "vrmod-manifest.json" } : new[] { "release-manifest.json", "vrmod-manifest.json" })
             {
                 var manifest = Path.Combine(location, name);
-                if (File.Exists(manifest)) return Read(manifest);
+                if (File.Exists(manifest)) return Read(manifest, d2rLoader);
             }
             var candidates = Directory.EnumerateFiles(location, "*.exe", SearchOption.TopDirectoryOnly)
                 .Where(p => !Regex.IsMatch(Path.GetFileName(p), "unins|setup|install|update|crash", RegexOptions.IgnoreCase)).ToList();
             if (candidates.Count != 1) throw new InvalidOperationException("Choose the app's EXE or a version manifest; this folder has no unambiguous version source.");
-            return Read(candidates[0]);
+            return Read(candidates[0], d2rLoader);
         }
         if (!File.Exists(location)) throw new FileNotFoundException("Install location is missing. Last known version kept.");
         string? version = null;
@@ -31,7 +32,16 @@ public static class InstalledVersions
             using var stream = File.OpenRead(location);
             if (stream.Length > 2 * 1024 * 1024) throw new InvalidOperationException("Version manifest is too large.");
             using var json = JsonDocument.Parse(stream);
-            foreach (var field in new[] { "release_tag", "version" })
+            if (d2rLoader && Path.GetFileName(location).Equals("manifest.json", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!json.RootElement.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String) throw new InvalidOperationException("D2RLoader manifest.json has no top-level name with a version.");
+                var markers = Regex.Matches(name.GetString() ?? "", @"(?:^|[-_])[vV]?(?=\d+\.\d)");
+                if (markers.Count == 0) throw new InvalidOperationException("D2RLoader manifest name must end in a version such as -0.1.4 or -v2.3.4.");
+                var marker = markers[markers.Count - 1];
+                version = name.GetString()!.Substring(marker.Index + marker.Length);
+                if (!Regex.IsMatch(version, @"^\d+\.\d+(?:\.\d+){0,2}(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?(?:\+[A-Za-z0-9][A-Za-z0-9.-]*)?$")) throw new InvalidOperationException("D2RLoader manifest name must end in a version such as -0.1.4 or -v2.3.4.");
+            }
+            else foreach (var field in new[] { "release_tag", "version" })
                 if (json.RootElement.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())) { version = value.GetString(); break; }
         }
         else if (Path.GetExtension(location).Equals(".exe", StringComparison.OrdinalIgnoreCase))
@@ -91,7 +101,7 @@ public static class InstalledVersions
         if (!app.AutoReconcile) { app.LocalStatus = app.InstalledProvenance.Length > 0 ? app.InstalledProvenance : "Manual version tracking"; return; }
         try
         {
-            var found = Read(app.InstallLocation);
+            var found = Read(app.InstallLocation, UsesD2RLoaderManifest(app));
             app.Installed = found.Version;
             app.LocalStatus = $"Detected {found.Version} from {found.Source}";
             app.LocalError = false;

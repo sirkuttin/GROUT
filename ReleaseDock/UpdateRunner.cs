@@ -106,12 +106,26 @@ public static class UpdateRunner
             status("Inspecting ZIP contents…", 100);
             var staging = await Task.Run(() => FileUpdates.StageZip(path, newWork("staging"), cancel));
             cancel.ThrowIfCancellationRequested();
-            var plan = FileUpdates.PlanZip(staging, app.UpdateTarget, app.ZipSubfolder, app.ZipSourceIsFile);
+            var d2rLoader = InstalledVersions.UsesD2RLoaderManifest(app);
+            var selection = FileUpdates.ResolveZipSelection(staging, app.ZipSubfolder, app.ZipSourceIsFile, d2rLoader);
+            var plan = FileUpdates.PlanZip(staging, app.UpdateTarget, selection, app.ZipSourceIsFile, d2rLoader);
             foreach (var file in plan) file.Apply = true;
             status("Extracting ZIP…", 100);
             app.LastBackup = newWork("backups"); persist();
             var previous = InstallationSnapshot.Capture(app);
             await Task.Run(() => FileUpdates.Apply(plan, app.UpdateTarget, app.LastBackup, previous));
+            app.ZipSubfolder = selection;
+            if (d2rLoader)
+            {
+                var manifests = plan.Where(f => Path.GetFileName(f.Relative).Equals("manifest.json", StringComparison.OrdinalIgnoreCase)).ToList();
+                if (manifests.Count == 1)
+                {
+                    app.D2RManagedFolder = Framework.GetDirectoryName(manifests[0].Relative) ?? "";
+                    app.AppFolder = app.UpdateTarget; app.AppFile = "";
+                    app.VersionSourceOverride = manifests[0].Relative;
+                    app.InstallLocation = manifests[0].Target;
+                }
+            }
             app.PartialUpdate = false;
             app.UpdateState = "Files applied — installation not yet verified"; persist();
         }

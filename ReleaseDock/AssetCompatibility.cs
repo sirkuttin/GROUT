@@ -19,8 +19,9 @@ public static class AssetCompatibility
     }
     public static List<Asset> Candidates(IEnumerable<Asset> assets, bool showAll = false, Architecture? architecture = null)
     {
+        static bool RawPlugin(Asset asset) => asset.OriginHost == "d2rloader.net" && (asset.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || asset.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
         var arch = architecture ?? RuntimeInformation.OSArchitecture;
         int Rank(Asset asset) => !ForWindows(asset.Name, arch) ? 100 : arch == Architecture.X64 && Token(asset.Name, "x64|amd64|x86_64|win64") || arch == Architecture.Arm64 && Token(asset.Name, "arm64|aarch64") ? 0 : Token(asset.Name, "x86(?![_-]64)|i386|i686|win32") ? 30 : 10;
-        return assets.Where(a => Repositories.IsWindowsAsset(a.Name) && (showAll || ForWindows(a.Name, arch))).OrderBy(Rank).ToList();
+        return assets.Where(a => (Repositories.IsWindowsAsset(a.Name) || RawPlugin(a)) && (showAll || RawPlugin(a) || ForWindows(a.Name, arch))).OrderBy(Rank).ToList();
     }
 }

@@ -4,6 +4,13 @@ using System.Text.RegularExpressions;
 namespace ReleaseDock;
 public static class AppUninstall
 {
+    public static string ZipFolder(TrackedApp app)
+    {
+        var folder = AppLocationDraft.From(app).Folder;
+        if (InstalledVersions.UsesD2RLoaderManifest(app) && app.D2RManagedFolder.Length > 0)
+            folder = Path.Combine(folder, FileUpdates.SafeRelative(app.D2RManagedFolder));
+        return PortableFolder(folder);
+    }
     public static bool RegistrationGone(string id)
     {
         try

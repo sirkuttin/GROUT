@@ -37,6 +37,7 @@ public partial class App : Application
         }
         if (e.Args.Length > 0 && e.Args is not ["--tray"] && !selfRestart)
         {
+            if (e.Args is ["--preview-d2rloader", var d2rOutput]) { D2RLoaderTests.Preview(d2rOutput); Shutdown(); return; }
             if (e.Args is ["--preview-zip-selection", var zipOutput]) { ZipSelectionTests.Preview(zipOutput); Shutdown(); return; }
             if (e.Args is ["--check-self-update", var selfReport])
             {
@@ -69,7 +70,7 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {D2RLoaderTests.Assertions} D2RLoader, {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }
@@ -126,7 +127,7 @@ public partial class App : Application
                 window.Close(); Shutdown(); return;
             }
             var help = e.Args is ["--help"] or ["-h"];
-            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-zip-selection PNG_PATH | --preview-nexus PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
+            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-d2rloader PNG_PATH | --preview-zip-selection PNG_PATH | --preview-nexus PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
             Shutdown(help ? 0 : 2); return;
         }
         instance = new Mutex(true, @"Local\ReleaseDock-" + Environment.UserName, out var first);

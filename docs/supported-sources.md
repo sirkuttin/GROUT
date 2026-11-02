@@ -9,6 +9,7 @@ GROUT tracks **public releases** on these hosts:
 | GitHub | Repository/release URLs or `owner/repository` | Native prerelease metadata; drafts excluded |
 | Codeberg.org | Repository/release URLs | Previews included when enabled; drafts excluded |
 | GitLab.com | Project/release URLs, including nested subgroups | Common preview markers in tags |
+| D2RLoader (0.8.0 test builds) | Mod page or individual plugin API URL | Published releases only; common preview markers in versions |
 
 ```text
 https://github.com/owner/app
@@ -53,3 +54,7 @@ Tracked-app downloads are checked against the published byte count and SHA-256 d
 ZIP inspection rejects unsafe paths, Windows device names, duplicate/colliding paths, archive links and linked destination paths. Limits are 10,000 entries and 8 GB uncompressed data. Download cancellation preserves destination files; file application completes or attempts rollback once started.
 
 A developer can still publish an unsuitable package. Choose the release file and destination carefully; included archive files overwrite matching files. GROUT does not forcibly shut down third-party apps or silently elevate file updates.
+
+## D2RLoader
+
+Mod page and detail API URLs map to the same tracked item. **Browse D2RLoader…** in Add App reads the paginated catalog on demand. Checks use the chosen mod detail endpoint rather than scanning the catalog. Downloads use the release-ID endpoint with exact byte-size and SHA-256 verification. Loader requirements and source scan warnings are preserved. See the [D2RLoader guide](d2rloader.md).

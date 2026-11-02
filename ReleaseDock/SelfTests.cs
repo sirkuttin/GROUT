@@ -21,6 +21,7 @@ internal static class SelfTests
     }
     private static async Task RunAll()
     {
+        await D2RLoaderTests.Run();
         await NexusTests.Run();
         FrameworkTests.Run();
         AssetCompatibilityTests.Run();

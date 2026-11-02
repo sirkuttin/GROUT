@@ -19,7 +19,18 @@ public static class SelfUpdateMigration
         SelfUpdateHandoff.Verify(package, hash);
         var next = destination + ".grout-next-" + Guid.NewGuid().ToString("N"); var installed = false;
         try { File.Copy(package, next); File.Move(next, destination); installed = true; launch(); }
-        catch { if (installed) File.Delete(destination); throw; }
+        catch
+        {
+            if (installed)
+            {
+                for (var attempt = 0; ; attempt++)
+                {
+                    try { if (File.Exists(destination)) { SelfUpdateHandoff.Verify(destination, hash); File.Delete(destination); } break; }
+                    catch (Exception ex) when (attempt < 50 && ex is IOException or UnauthorizedAccessException) { Thread.Sleep(50); }
+                }
+            }
+            throw;
+        }
         finally { if (File.Exists(next)) File.Delete(next); }
     }
     public static void UpdateShortcuts(string oldPath, string newPath, IEnumerable<string> roots)

@@ -125,9 +125,48 @@ public static class FileUpdates
         if (!Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories).Any()) throw new IOException("Folder '" + relative + "' inside the ZIP contains no files. Nothing was installed.");
         return source;
     }
-    public static List<UpdateFile> PlanZip(string staging, string destination, string selection, bool isFile)
+    internal static string StableD2RFolder(string name) => Regex.Replace(name, @"[-_][vV]?\d+\.\d+(?:\.\d+){0,2}(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?(?:\+[A-Za-z0-9][A-Za-z0-9.-]*)?$", "");
+    public static string ResolveZipSelection(string staging, string selection, bool isFile, bool d2rLoader = false)
     {
-        if (!isFile) return Plan(ZipSource(staging, selection), destination, false);
+        selection = NormalizeZipSubfolder(selection);
+        if (selection.Length == 0 || !d2rLoader) return selection;
+        var exact = Path.Combine(staging, selection.Replace('/', Path.DirectorySeparatorChar));
+        if (isFile ? File.Exists(exact) : Directory.Exists(exact)) return selection;
+        string Identity(string path)
+        {
+            var parts = path.Replace('\\', '/').Split('/');
+            return string.Join("/", parts.Select((part, index) => isFile && index == parts.Length - 1 ? part : StableD2RFolder(part)));
+        }
+        var candidates = isFile ? Directory.GetFiles(staging, "*", SearchOption.AllDirectories) : Directory.GetDirectories(staging, "*", SearchOption.AllDirectories);
+        var matches = candidates.Select(path => Framework.GetRelativePath(staging, path).Replace('\\', '/')).Where(path => Identity(path).Equals(Identity(selection), StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
+        if (matches.Count > 1) throw new IOException("More than one ZIP item matches the saved D2RLoader selection. Choose ZIP contents again.");
+        return matches.Count == 1 ? matches[0] : selection;
+    }
+    public static List<UpdateFile> PlanZip(string staging, string destination, string selection, bool isFile, bool d2rLoader = false)
+    {
+        if (!isFile)
+        {
+            var sourceRoot = ZipSource(staging, selection);
+            var plan = Plan(sourceRoot, destination, false);
+            if (!d2rLoader) return plan;
+            var mappedFolders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in plan)
+            {
+                var parts = file.Relative.Split(Path.DirectorySeparatorChar); var original = ""; var mapped = "";
+                for (var index = 0; index < parts.Length - 1; index++)
+                {
+                    original = original.Length == 0 ? parts[index] : Path.Combine(original, parts[index]);
+                    var folderName = File.Exists(Path.Combine(sourceRoot, original, "manifest.json")) ? StableD2RFolder(parts[index]) : parts[index];
+                    SafeRelative(folderName);
+                    mapped = mapped.Length == 0 ? folderName : Path.Combine(mapped, folderName);
+                    if (mappedFolders.TryGetValue(mapped, out var previous) && !previous.Equals(original, StringComparison.OrdinalIgnoreCase)) throw new IOException("Multiple D2RLoader folders map to '" + mapped + "'. Choose a single ZIP folder to install.");
+                    mappedFolders[mapped] = original; parts[index] = folderName;
+                }
+                file.Relative = SafeRelative(string.Join(Path.DirectorySeparatorChar.ToString(), parts));
+                file.Target = Path.Combine(Path.GetFullPath(destination), file.Relative); NoLinks(file.Target); file.Existed = File.Exists(file.Target);
+            }
+            return plan;
+        }
         var relative = NormalizeZipSubfolder(selection);
         if (relative.Length == 0) throw new IOException("Choose a file inside the ZIP.");
         var source = Path.Combine(Path.GetFullPath(staging), relative.Replace('/', Path.DirectorySeparatorChar));

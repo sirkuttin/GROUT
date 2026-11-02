@@ -13,7 +13,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Version>0.7.1</Version>
+    <Version>0.8.0</Version>
     <ApplicationIcon>Assets/GROUT.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

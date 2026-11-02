@@ -4,24 +4,30 @@ namespace ReleaseDock;
 
 public sealed record RepositoryRef(string Host, string Path)
 {
-    public string Name => Host switch { "codeberg.org" => "Codeberg", "gitlab.com" => "GitLab", "nexusmods.com" => "Nexus Mods", _ => "GitHub" };
+    public string Name => Host switch { "d2rloader.net" => "D2RLoader", "codeberg.org" => "Codeberg", "gitlab.com" => "GitLab", "nexusmods.com" => "Nexus Mods", _ => "GitHub" };
     public string WebUrl => $"https://{Host}/{Path}";
     public string Key => Host == "github.com" ? Path : WebUrl;
-    public string ReleasesUrl => Host == "nexusmods.com" ? WebUrl + "?tab=files" : WebUrl + (Host == "gitlab.com" ? "/-/releases" : "/releases");
-    public string ApiUrl => Host switch { "nexusmods.com" => "https://api.nexusmods.com/v1/games/" + Path.Split('/')[0] + "/mods/" + Path.Split('/')[2], "codeberg.org" => $"https://codeberg.org/api/v1/repos/{Path}", "gitlab.com" => "https://gitlab.com/api/v4/projects/" + Uri.EscapeDataString(Path), _ => $"https://api.github.com/repos/{Path}" };
+    public string ReleasesUrl => Host == "d2rloader.net" ? WebUrl : Host == "nexusmods.com" ? WebUrl + "?tab=files" : WebUrl + (Host == "gitlab.com" ? "/-/releases" : "/releases");
+    public string ApiUrl => Host switch { "d2rloader.net" => "https://d2rloader.net/api/v1/" + Path, "nexusmods.com" => "https://api.nexusmods.com/v1/games/" + Path.Split('/')[0] + "/mods/" + Path.Split('/')[2], "codeberg.org" => $"https://codeberg.org/api/v1/repos/{Path}", "gitlab.com" => "https://gitlab.com/api/v4/projects/" + Uri.EscapeDataString(Path), _ => $"https://api.github.com/repos/{Path}" };
 }
 
 public static class Repositories
 {
     public static RepositoryRef Resolve(string input)
     {
-        input = input.Trim(); if (input.StartsWith("www.nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("nexusmods.com/", StringComparison.OrdinalIgnoreCase)) input = "https://" + input; var host = "github.com";
+        input = input.Trim(); if (input.StartsWith("www.nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("d2rloader.net/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("www.d2rloader.net/", StringComparison.OrdinalIgnoreCase)) input = "https://" + input; var host = "github.com";
         if (!input.Contains("://") && (input.StartsWith("codeberg.org/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("gitlab.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("github.com/", StringComparison.OrdinalIgnoreCase))) input = "https://" + input;
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri))
         {
-            host = uri.Host.ToLowerInvariant(); if (host == "www.nexusmods.com") host = "nexusmods.com";
-            if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || host is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com")) throw new ArgumentException("Use an HTTPS project link from GitHub, Codeberg, GitLab.com or Nexus Mods.");
+            host = uri.Host.ToLowerInvariant(); if (host == "www.nexusmods.com") host = "nexusmods.com"; if (host == "www.d2rloader.net") host = "d2rloader.net";
+            if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || host is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com" or "d2rloader.net")) throw new ArgumentException("Use an HTTPS project link from a supported source: GitHub, Codeberg, GitLab, D2RLoader or Nexus Mods (test builds).");
             var path = uri.AbsolutePath.Trim('/');
+            if (host == "d2rloader.net")
+            {
+                var mod = Regex.Match(path, @"^(?:api/v1/)?hub/plugins/([a-z0-9][a-z0-9_-]*)$", RegexOptions.IgnoreCase);
+                if (!mod.Success) throw new ArgumentException("Paste an individual D2RLoader mod page, or choose Browse D2RLoader to select one.");
+                return new(host, "hub/plugins/" + mod.Groups[1].Value.ToLowerInvariant());
+            }
             if (host == "nexusmods.com")
             {
                 var mod = Regex.Match(path, @"^(?:games/)?([a-z0-9_-]+)/mods/([1-9][0-9]*)/?$", RegexOptions.IgnoreCase);

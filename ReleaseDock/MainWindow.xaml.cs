@@ -168,7 +168,7 @@ public partial class MainWindow : Window
         UpdateButton.Content = asset?.OriginHost == "nexusmods.com" && (preview || !github.Nexus.CanDownload) ? "Open Nexus download" : "Update";
         UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose a release download in App settings." : "Apply the configured update method.";
         MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod) + (asset == null ? " · Choose a release file in App settings" : app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
-        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.UpdateIssue }.Where(s => s.Length > 0));
+        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.Release?.SourceWarning ?? "", app.UpdateIssue }.Where(s => s.Length > 0));
         UpdateStateLabel.Visibility = UpdateStateLabel.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         DownloadedButton.Visibility = app?.UpdateMethod == "Manual" && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
         AppFolderButton.Visibility = app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -286,7 +286,7 @@ public partial class MainWindow : Window
     {
         if (busy || Current is not { } app) return;
         if (app.AutoReconcile) { ReconcileAll(); StatusLabel.Text = app.LocalStatus; return; }
-        try { var found = InstalledVersions.Read(app.InstallLocation); app.Installed = found.Version; app.InstalledProvenance = "Version checked from " + found.Source; InstalledVersions.Reconcile(app); SafePersist(); Render(); StatusLabel.Text = "Version checked once. Manual tracking remains enabled."; }
+        try { var found = InstalledVersions.Read(app.InstallLocation, InstalledVersions.UsesD2RLoaderManifest(app)); app.Installed = found.Version; app.InstalledProvenance = "Version checked from " + found.Source; InstalledVersions.Reconcile(app); SafePersist(); Render(); StatusLabel.Text = "Version checked once. Manual tracking remains enabled."; }
         catch (Exception ex) { StatusLabel.Text = ex.Message + " Last recorded version kept."; }
     }
     private void Mark_Click(object sender, RoutedEventArgs e)
@@ -430,7 +430,7 @@ public partial class MainWindow : Window
             {
                 var draft = AppLocationDraft.From(app);
                 if (draft.Conflict) throw new InvalidOperationException("Resolve the app location conflict in App settings first.");
-                var target = AppUninstall.PortableFolder(draft.Folder);
+                var target = AppUninstall.ZipFolder(app);
                 if (MessageBox.Show(this, $"Remove {app.AppName} and its entire app folder?\n\n{target}\n\nClose the app first. ALL files and subfolders here, including settings and any files you added, will move to the Recycle Bin. Check that this folder belongs only to this app. Its GROUT entry will also be removed.", "Remove portable app folder", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
                 busy = true; AppUninstall.Begin(app, target); Persist(); Render();
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(target, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);

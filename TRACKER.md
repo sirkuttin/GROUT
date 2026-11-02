@@ -275,3 +275,16 @@
 - User confirmed Nexus registration is not completed and explicitly chose to publish with Nexus disabled. Public API requests and connection UI are disabled; previously saved Nexus entries still load. Private testing requires NexusTestingEnabled=true. Release script forces false.
 - Publish the visual ZIP folder/file selector, remembered future-update mapping and ZIP/cache safety tests.
 - Public version is 0.7.1 so existing 0.7.0 private test builds can detect the release through the self-updater. Public-build suite passed all regressions including 54 Nexus gate/behavior checks and 30 ZIP selection checks.
+
+## 0.8.0 D2RLoader source
+- User-provided mod-page and detail API URLs normalize to one identity. Added published-release selection by publication date, SHA-256/byte-size checks, loader notes and scan warnings including moderator review context.
+- Added paginated catalog picker in Add App. ZIPs reuse visual contents selection/install/update; standalone DLL/JSON releases use Download only. Nexus remains disabled.
+- Live API/detail/page2 and supplied mod-page reads succeeded. Automatic approval review blocked launching GROUT's live-network diagnostic, so that app-level smoke test is not claimed. Provider/ZIP/catalog behavior is tested with simulated responses.
+- Existing self-updater smoke test exposed an intermittent Windows failed-process image lock. Failed filename migration now retries verified-target cleanup for up to 2.5 seconds, preserving a changed destination.
+
+## D2RLoader manifest, folder names and search
+- User specified top-level manifest.json name as version source; parse trailing -v2.3.4 and preserve channel/build suffixes. Scope discovery to D2RLoader; invalid/missing name keeps prior version with a warning.
+- Version suffixes removed from installed D2RLoader mod folder names when the archive folder has a manifest. Original manifest contents retained. Unique version-renamed ZIP selections resolve automatically; collisions/ambiguity stop before writes. Existing user folders are not renamed.
+- Record installed nested manifest and owned mod subfolder so version detection and uninstall stay scoped correctly under a shared plugins destination.
+- Added API q search with Enter/Search, page-one reset, query-preserving paging and clearing. Live q=stash metadata returned results. Tests drive the actual browser search/page/clear flow with simulated responses.
+- Fixed existing-app detection for manifest names without a v marker (d2rl-auto-deposit-0.1.4). Verified the actual local manifest read-only; its numeric version 2 is schema metadata. Packaged regression suite passes, including 59 D2RLoader assertions and existing-app setup detection.
