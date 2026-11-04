@@ -74,6 +74,7 @@ public sealed class InstallDiscovery(Func<IReadOnlyList<InstalledRegistration>>?
     public static InstallationCandidate? ClearMatch(IReadOnlyList<InstallationCandidate> candidates) => candidates.Count > 0 && candidates[0].Score >= 100 && (candidates.Count == 1 || candidates[0].Score - candidates[1].Score >= 20) ? candidates[0] : null;
     public static void Apply(TrackedApp app, InstallationCandidate candidate)
     {
+        if (!string.IsNullOrWhiteSpace(candidate.Entry.Version)) app.VersionRecord = null;
         app.InstallationLocated = true;
         app.AppFolder = candidate.Folder; app.AppFile = candidate.AppFile; app.VersionSourceOverride = "";
         app.InstallLocation = candidate.AppFile.Length > 0 ? Path.Combine(candidate.Folder, candidate.AppFile) : candidate.Folder;

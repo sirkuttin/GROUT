@@ -64,6 +64,11 @@ Temporary rollback copies protect a file update internally while it is applied; 
 
 ## Installed versions
 
+Successful ZIP extraction, portable EXE copying and located installer installations can use a GROUT installation record when no usable version is supplied. The record stores the applied release and installed file paths under `%LOCALAPPDATA%\ReleaseDock\versions`; GROUT does not create or alter a publisher manifest in the app folder. It updates this small JSON record after each successful installation. A failed or cancelled operation does not advance the recorded version, and missing app files still produce an alert.
+
+When a real EXE/manifest version becomes readable again, GROUT resumes normal detection and deletes its fallback record on save. An unchanged stale manifest left by an earlier ZIP does not override the newly applied release. Removing the app from GROUT also removes the record. Installer exit alone is insufficient: a matching installed location/files must be found or selected.
+
+
 
 EXE detection reads `ProductVersion`, falling back to `FileVersion`, without executing the file. For a folder, GROUT tries:
 

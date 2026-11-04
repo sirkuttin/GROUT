@@ -8,7 +8,7 @@ public enum UpdateOutcome { Downloaded, Deferred, FilesApplied, InstallerReturne
 
 public sealed class UpdatePrompts
 {
-    public Func<string, Task> ExecuteInstaller { get; init; } = async path => { using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); if (process != null) await process.WaitForExitAsync(); };
+    public Func<string, Task> ExecuteInstaller { get; init; } = async path => { using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); if (process == null) throw new IOException("The installer did not return a process to check."); await process.WaitForExitAsync(); if (process.ExitCode is not (0 or 1641 or 3010)) throw new IOException("The installer did not complete successfully (exit code " + process.ExitCode + ")."); };
     public Func<Window, bool> LeaveSetup { get; init; } = owner => MessageBox.Show(owner, "Leave setup? Downloads and any installation already performed stay on disk, but this app will not be added to your library.", "Leave Add App", MessageBoxButton.YesNo) == MessageBoxResult.Yes;
     // Kept as a regression-test hook: applying files must never invoke a review.
     public Func<Window, List<UpdateFile>, string?, string, bool> ReviewFiles { get; init; } = (_, _, _, _) => true;
@@ -73,7 +73,9 @@ public static class UpdateRunner
             discovery ??= new(); var before = await Task.Run(discovery.Snapshot); app.InstallationBefore = before; app.InstallationLocated = false;
             app.UpdateState = "Installer started — installation not yet verified"; persist();
             status(app.UpdateState, 100);
+            app.PendingInstallerRelease = "";
             await prompts.ExecuteInstaller(path);
+            app.PendingInstallerRelease = app.Latest;
             status("Looking for the installed app…", 100);
             for (var attempt = 0; attempt < 4; attempt++)
             {
@@ -82,12 +84,14 @@ public static class UpdateRunner
                 if (match != null && (newInstall || app.InstallLocation.Length == 0 || string.Equals(AppLocationDraft.From(app).Folder.TrimEnd('\\'), match.Folder, StringComparison.OrdinalIgnoreCase)))
                 {
                     InstallDiscovery.Apply(app, match);
+                    if (match.Changed && string.IsNullOrWhiteSpace(match.Entry.Version)) InstalledVersions.RecordInstallerWithoutVersion(app, match.Entry.Id);
                     if (InstallDiscovery.CanFinish(app)) break;
                     app.InstallDiscoveryNote = $"Found {match.Entry.Name}, but it still reports {app.Installed}. The expected release is {app.Latest}. Confirm the installation or try finding it again.";
                 }
                 else app.InstallDiscoveryNote = app.InstallCandidates.Count > 0 ? "Possible installations found. Choose the correct entry or keep the configured location." : "No matching install location found yet. The installer may still be finishing; try Find installation again.";
                 if (attempt < 3) await Task.Delay(750);
             }
+            if (!newInstall && app.InstallLocation.Length > 0 && app.InstallCandidates.Count == 0) InstalledVersions.RecordInstallerWithoutVersion(app);
         }
         else if (app.UpdateMethod == "ReplaceExe")
         {
@@ -127,6 +131,7 @@ public static class UpdateRunner
                 }
             }
             app.PartialUpdate = false;
+            InstalledVersions.RecordAppliedZip(app, plan);
             app.UpdateState = "Files applied — installation not yet verified"; persist();
         }
         InstalledVersions.Reconcile(app);

@@ -42,7 +42,7 @@ public static class WizardTests
         var window = new SetupWindow(github, []);
         try
         {
-            var input = Children<TextBox>(window).Single(); input.Text = "https://github.com/test/app/releases";
+            var input = Children<TextBox>(window).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link"); input.Text = "https://github.com/test/app/releases";
             var next = Children<Button>(window).Single(b => Equals(b.Content, "Next →"));
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await WaitFor(() => Children<Button>(window).Any(b => Equals(b.Content, "Add App")));
@@ -51,7 +51,7 @@ public static class WizardTests
             Check(Children<ComboBox>(window).Single(c => System.Windows.Automation.AutomationProperties.GetName(c) == "Release download").SelectedIndex == 0, "Single compatible file selected");
             Check(handler.Requests.Count == 2, "Lookup verifies project and release without duplicate calls");
             var back = Children<Button>(window).Single(b => Equals(b.Content, "← Back")); back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Check(Children<TextBox>(window).Single().Text == "test/app", "Back preserves repository");
+            Check(Children<TextBox>(window).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text == "test/app", "Back preserves repository");
             Children<CheckBox>(window).Single().IsChecked = true;
             Children<Button>(window).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await WaitFor(() => Children<Button>(window).Any(b => Equals(b.Content, "Add App")));
@@ -62,7 +62,7 @@ public static class WizardTests
         var manual = new SetupWindow(missing, []);
         try
         {
-            Children<TextBox>(manual).Single().Text = "test/app";
+            Children<TextBox>(manual).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "test/app";
             Children<Button>(manual).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await WaitFor(() => Children<Button>(manual).Any(b => Equals(b.Content, "Add App")));
             Check(manual.Result.Release == null, "Existing app can continue without a release");
@@ -71,7 +71,7 @@ public static class WizardTests
         var fresh = new SetupWindow(missing, []);
         try
         {
-            Children<TextBox>(fresh).Single().Text = "test/app";
+            Children<TextBox>(fresh).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "test/app";
             Children<RadioButton>(fresh).Single(b => Equals(b.Content, "Install this app")).IsChecked = true;
             Children<Button>(fresh).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await Task.Delay(40);

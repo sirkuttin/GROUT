@@ -21,6 +21,8 @@ internal static class SelfTests
     }
     private static async Task RunAll()
     {
+        await VersionRecordTests.Run();
+        await WebsiteSourceTests.Run();
         await D2RLoaderTests.Run();
         await NexusTests.Run();
         FrameworkTests.Run();

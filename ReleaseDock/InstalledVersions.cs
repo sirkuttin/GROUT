@@ -9,6 +9,16 @@ public sealed record InstalledVersion(string Version, string Source);
 
 public static class InstalledVersions
 {
+    public static InstalledVersion ReadForApp(TrackedApp app, string location)
+    {
+        if (app.AutoReconcile && app.VersionRecord != null && string.Equals(Path.GetFullPath(location), Path.GetFullPath(app.InstallLocation), StringComparison.OrdinalIgnoreCase))
+        {
+            Reconcile(app);
+            if (app.LocalError) throw new InvalidOperationException(app.LocalStatus);
+            if (app.VersionRecord != null) return new(app.Installed, "GROUT installation record");
+        }
+        return Read(location, UsesD2RLoaderManifest(app));
+    }
     public static bool UsesD2RLoaderManifest(TrackedApp app) => app.Repo.Length > 0 && Repositories.Resolve(app.Repo).Host == "d2rloader.net";
     public static InstalledVersion Read(string location, bool d2rLoader = false)
     {
@@ -99,6 +109,37 @@ public static class InstalledVersions
         }
         if (!app.AutoReconcile) app.LocalError = false;
         if (!app.AutoReconcile) { app.LocalStatus = app.InstalledProvenance.Length > 0 ? app.InstalledProvenance : "Manual version tracking"; return; }
+        if (app.VersionRecord is { } record)
+        {
+            if (!InstalledReleaseRecords.ValidLocation(app, record)) app.VersionRecord = null;
+            else
+            {
+                try
+                {
+                    var actual = Read(app.InstallLocation, UsesD2RLoaderManifest(app));
+                    if (InstalledReleaseRecords.NewSource(record, actual))
+                    {
+                        app.VersionRecord = null; app.Installed = actual.Version;
+                        app.InstalledProvenance = "Version read from " + actual.Source;
+                        app.LocalStatus = $"Detected {actual.Version} from {actual.Source}"; app.LocalError = false; return;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
+                if (record.RegistrationId.Length > 0 && InstallDiscovery.ReadRegistry().FirstOrDefault(r => r.Id == record.RegistrationId) is { } registration && !string.IsNullOrWhiteSpace(registration.Version))
+                {
+                    app.VersionRecord = null; app.AutoReconcile = false; app.Installed = registration.Version; app.LocalError = false;
+                    app.InstalledProvenance = "Windows installed-app entry " + registration.Name + " reports " + registration.Version; app.LocalStatus = app.InstalledProvenance; return;
+                }
+                var missing = record.Files.Where(f => !File.Exists(f)).ToList();
+                if (missing.Count > 0)
+                {
+                    app.LocalError = true; app.InstallationMissing = missing.Count == record.Files.Length;
+                    app.LocalStatus = "Recorded app files are missing: " + missing[0]; return;
+                }
+                app.Installed = record.Version; app.LocalError = false;
+                app.LocalStatus = "Release " + record.Version + " recorded by GROUT after installation"; return;
+            }
+        }
         try
         {
             var found = Read(app.InstallLocation, UsesD2RLoaderManifest(app));
@@ -127,7 +168,35 @@ public static class InstalledVersions
             else app.InstalledProvenance += $" The EXE reports {detected.Version}; automatic metadata comparison is paused.";
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
+        if (!app.AutoReconcile) InstalledReleaseRecords.Record(app, [app.UpdateTarget]);
+        else app.VersionRecord = null;
         Reconcile(app);
         app.UpdateState = "";
+    }
+    public static void RecordAppliedZip(TrackedApp app, List<UpdateFile> plan)
+    {
+        var candidates = plan.Where(f => Path.GetFileName(f.Target).Equals("release-manifest.json", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(f.Target).Equals("vrmod-manifest.json", StringComparison.OrdinalIgnoreCase) || UsesD2RLoaderManifest(app) && Path.GetFileName(f.Target).Equals("manifest.json", StringComparison.OrdinalIgnoreCase) || string.Equals(f.Target, app.InstallLocation, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (candidates.Count == 0) candidates = plan.Where(f => Path.GetExtension(f.Target).Equals(".exe", StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(Path.GetFileName(f.Target), "unins|setup|install|update|crash", RegexOptions.IgnoreCase)).ToList();
+        if (candidates.Count == 1)
+        {
+            try
+            {
+                var found = Read(candidates[0].Target, UsesD2RLoaderManifest(app));
+                app.AppFolder = app.UpdateTarget; app.AppFile = ""; app.VersionSourceOverride = candidates[0].Relative; app.InstallLocation = found.Source;
+                app.AutoReconcile = true; app.VersionRecord = null; Reconcile(app); return;
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
+        }
+        app.AppFolder = app.UpdateTarget; app.AppFile = ""; app.VersionSourceOverride = ""; app.InstallLocation = app.UpdateTarget;
+        InstalledReleaseRecords.Record(app, plan.Select(f => f.Target)); Reconcile(app);
+    }
+    public static void RecordInstallerWithoutVersion(TrackedApp app, string registrationId = "")
+    {
+        if (app.PendingInstallerRelease != app.Latest || app.Latest.Length == 0 || app.InstallLocation.Length == 0) return;
+        try { _ = Read(app.InstallLocation, UsesD2RLoaderManifest(app)); app.VersionRecord = null; return; }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
+        var folder = AppLocationDraft.From(app).Folder;
+        var files = File.Exists(app.InstallLocation) ? new[] { app.InstallLocation } : Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Take(10001).ToArray() : [];
+        if (files.Length is > 0 and <= 10000) { InstalledReleaseRecords.Record(app, files, registrationId); Reconcile(app); }
     }
 }

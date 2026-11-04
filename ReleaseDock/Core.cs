@@ -18,6 +18,7 @@ public sealed class TrackedApp
     [JsonIgnore] public string ProjectLabel { get { if (Repo.Length == 0) return ""; var source = Repositories.Resolve(Repo); return source.Path + (source.Host == "github.com" ? "" : " · " + source.Name); } }
     public string Installed { get; set; } = "";
     public string Latest { get; set; } = "";
+    public string WebsiteDownloadUrl { get; set; } = "";
     public string AssetName { get; set; } = "";
     public long NexusFileId { get; set; }
     public bool IncludePrereleases { get; set; }
@@ -36,6 +37,9 @@ public sealed class TrackedApp
     public string DownloadedPath { get; set; } = "";
     public string DownloadedTag { get; set; } = "";
     public string InstalledProvenance { get; set; } = "";
+    public string VersionRecordId { get; set; } = "";
+    [JsonIgnore] public InstalledReleaseRecord? VersionRecord { get; set; }
+    public string PendingInstallerRelease { get; set; } = "";
     public string AppFolder { get; set; } = "";
     public string AppFile { get; set; } = "";
     public string VersionSourceOverride { get; set; } = "";
@@ -67,11 +71,18 @@ public sealed record Release(string Tag, string Url, string Notes, List<Asset> A
 
 public sealed class Store(string path)
 {
-    public List<TrackedApp> Load() => File.Exists(path) ? JsonSerializer.Deserialize<List<TrackedApp>>(File.ReadAllText(path)) ?? [] : [];
+    public List<TrackedApp> Load()
+    {
+        var apps = File.Exists(path) ? JsonSerializer.Deserialize<List<TrackedApp>>(File.ReadAllText(path)) ?? [] : [];
+        InstalledReleaseRecords.Load(Path.GetDirectoryName(Path.GetFullPath(path))!, apps); return apps;
+    }
     public void Save(IEnumerable<TrackedApp> apps)
     {
         Directory.CreateDirectory(Framework.GetDirectoryName(path)!);
-        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(apps, new JsonSerializerOptions { WriteIndented = true }));
+        var list = apps.ToList(); var data = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        InstalledReleaseRecords.Save(data, list);
+        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true }));
         Framework.Move(path + ".tmp", path, true);
+        InstalledReleaseRecords.Clean(data, list);
     }
 }

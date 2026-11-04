@@ -59,7 +59,7 @@ public static class SourceWizardTests
             var window = new SetupWindow(client, []);
             try
             {
-                Find<TextBox>(window).Single().Text = project;
+                Find<TextBox>(window).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = project;
                 Find<Button>(window).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 for (var i = 0; i < 100 && !Find<Button>(window).Any(b => Equals(b.Content, "Add App")); i++) await Task.Delay(20);
                 Check(Find<Button>(window).Any(b => Equals(b.Content, "Add App")), "Source link reaches existing-app setup");
@@ -74,7 +74,7 @@ public static class SourceWizardTests
         var duplicate = new SetupWindow(client, ["https://codeberg.org/owner/app"]) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
         try
         {
-            Find<TextBox>(duplicate).Single().Text = "https://codeberg.org/OWNER/APP/releases/tag/v2";
+            Find<TextBox>(duplicate).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "https://codeberg.org/OWNER/APP/releases/tag/v2";
             _ = duplicate.Dispatcher.InvokeAsync(() => Find<Button>(duplicate).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             Check(duplicate.ShowDialog() == true && duplicate.ExistingRepo.Equals("https://codeberg.org/owner/app", StringComparison.OrdinalIgnoreCase), "Duplicate provider link opens existing app even with casing/release URL differences");
             Check(handler.Requests == before, "Duplicate app does not fetch or add a second entry");

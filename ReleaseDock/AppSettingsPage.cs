@@ -21,7 +21,9 @@ public sealed class AppSettingsPage
     private string checkedSource = "", checkedVersion = "", checkedFile = "";
     private bool customName, updatingName;
     private readonly TextBox? repository;
-    public string RepositoryKey => repository == null ? app.Repo : Repositories.Parse(repository.Text);
+    private readonly TextBox? websiteDownload;
+    public string WebsiteDownloadUrl => websiteDownload?.Text.Trim() ?? app.WebsiteDownloadUrl;
+    public string RepositoryKey => repository == null ? app.Repo : WebsiteSource.SourceKey(repository.Text);
     public StackPanel Panel { get; } = new();
     private static void Name(DependencyObject control, string label) => System.Windows.Automation.AutomationProperties.SetName(control, label);
     public AppSettingsPage(Window owner, TrackedApp app, bool allowRepositoryEdit = false, ReleaseClient? client = null)
@@ -32,6 +34,13 @@ public sealed class AppSettingsPage
             Panel.Children.Add(Ui.Text("Repository URL", 18));
             repository = Ui.Input(app.RepositoryUrl); Name(repository, "Repository URL"); Panel.Children.Add(repository);
             Panel.Children.Add(Ui.Text("Change this when the project moves. Installed files and version are kept; the new source is checked before saving. You may need to choose a new release download afterward.", muted: true));
+        }
+        if (allowRepositoryEdit || app.Repo.Length > 0 && Repositories.Resolve(app.Repo).IsWebsite)
+        {
+            var websitePanel = new StackPanel(); websitePanel.Children.Add(Ui.Text("Website download URL", 18)); websiteDownload = Ui.Input(app.WebsiteDownloadUrl); Name(websiteDownload, "Website download URL"); websitePanel.Children.Add(websiteDownload);
+            websitePanel.Children.Add(Ui.Text("The versioned download link used to find future releases on the website page.", muted: true)); Panel.Children.Add(websitePanel);
+            void ShowWebsite() { try { websitePanel.Visibility = Repositories.Resolve(RepositoryKey).IsWebsite ? Visibility.Visible : Visibility.Collapsed; } catch { websitePanel.Visibility = Visibility.Collapsed; } }
+            if (repository != null) repository.TextChanged += (_, _) => ShowWebsite(); ShowWebsite();
         }
         Panel.Children.Add(Ui.Text("App name", 18));
         appName = Ui.Input(app.AppName); Name(appName, "App name"); Panel.Children.Add(appName);
@@ -124,12 +133,15 @@ public sealed class AppSettingsPage
     {
         Refresh();
         if (automatic.IsChecked != true && !force) return;
-        try { var found = InstalledVersions.Read(draft.VersionSource, InstalledVersions.UsesD2RLoaderManifest(app)); checkedSource = draft.VersionSource; checkedVersion = found.Version; checkedFile = found.Source; app.Installed = found.Version; if (automatic.IsChecked != true) app.InstalledProvenance = "Version checked from " + found.Source; manual.Text = found.Version; detected.Text = found.Version + (automatic.IsChecked == true ? " · Automatic detection" : " · Checked now (manual tracking)") + "\nRead from " + Path.GetFileName(found.Source); }
+        try { var found = InstalledVersions.ReadForApp(app, draft.VersionSource); checkedSource = draft.VersionSource; checkedVersion = found.Version; checkedFile = found.Source; app.Installed = found.Version; if (automatic.IsChecked != true) app.InstalledProvenance = "Version checked from " + found.Source; manual.Text = found.Version; detected.Text = found.Version + (automatic.IsChecked == true ? " · Automatic detection" : " · Checked now (manual tracking)") + "\nRead from " + Path.GetFileName(found.Source); }
         catch (Exception ex) { detected.Text = "Installed version unverified\n" + ex.Message; }
     }
     public void Save(bool validate = true)
     {
         var source = RepositoryKey;
+        var websiteSeed = websiteDownload?.Text.Trim() ?? app.WebsiteDownloadUrl;
+        if (source.Length > 0 && Repositories.Resolve(source).IsWebsite && validate) WebsiteSource.Url(websiteSeed);
+        if (source.Length > 0 && Repositories.Resolve(source).IsWebsite) app.WebsiteDownloadUrl = websiteSeed; else app.WebsiteDownloadUrl = "";
         var sourceChanged = !source.Equals(app.Repo, StringComparison.OrdinalIgnoreCase);
         app.CustomName = customName ? appName.Text.Trim() : "";
         if (!customName) app.InvalidateSuggestedName();
@@ -144,6 +156,7 @@ public sealed class AppSettingsPage
         InstalledVersions.Reconcile(app);
         if (sourceChanged)
         {
+            app.VersionRecord = null; app.PendingInstallerRelease = "";
             app.Repo = source; app.Release = null; app.Latest = ""; app.CheckedAt = null; app.Error = "";
             app.AssetName = ""; app.NexusFileId = 0; app.D2RManagedFolder = ""; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
             app.UpdateState = "Repository changed — checking the new source";

@@ -196,7 +196,7 @@ public partial class MainWindow : Window
         InstalledVersions.Reconcile(app);
         try
         {
-            app.Release = await github.Latest(app.Repo, app.IncludePrereleases, app.NexusFileId); app.Latest = app.Release.Tag;
+            app.Release = await github.Latest(app.Repo, app.IncludePrereleases, app.NexusFileId, app.WebsiteDownloadUrl); app.Latest = app.Release.Tag;
             if (app.Release.SelectedFileId > 0) { app.NexusFileId = app.Release.SelectedFileId; app.AssetName = app.Release.Assets.First(a => a.FileId == app.NexusFileId).Name; }
             app.Error = app.NexusFileId > 0 && Repositories.Resolve(app.Repo).Host == "nexusmods.com" && app.Release.SelectedFileId == 0 ? "The tracked Nexus file is no longer available. Choose its replacement in App settings." : "";
             app.CheckedAt = DateTimeOffset.UtcNow;
@@ -292,12 +292,12 @@ public partial class MainWindow : Window
     private void Mark_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app || app.Latest.Length == 0) return;
-        app.Installed = app.Latest; app.PartialUpdate = false; app.AutoReconcile = false; app.InstalledProvenance = "Manually marked installed"; app.LocalStatus = app.InstalledProvenance; app.UpdateState = ""; SafePersist(); Render();
+        app.Installed = app.Latest; app.PartialUpdate = false; app.AutoReconcile = false; app.VersionRecord = null; app.InstalledProvenance = "Manually marked installed"; app.LocalStatus = app.InstalledProvenance; app.UpdateState = ""; SafePersist(); Render();
     }
     private void SaveVersion_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app) return;
-        app.Installed = InstalledInput.Text.Trim(); app.PartialUpdate = false; app.AutoReconcile = false; app.InstalledProvenance = "Manual version tracking"; app.LocalStatus = app.InstalledProvenance; SafePersist(); Render();
+        app.Installed = InstalledInput.Text.Trim(); app.PartialUpdate = false; app.AutoReconcile = false; app.VersionRecord = null; app.InstalledProvenance = "Manual version tracking"; app.LocalStatus = app.InstalledProvenance; SafePersist(); Render();
     }
     private async void Update_Click(object sender, RoutedEventArgs e)
     {

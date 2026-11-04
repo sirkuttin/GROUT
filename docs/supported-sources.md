@@ -9,7 +9,7 @@ GROUT tracks **public releases** on these hosts:
 | GitHub | Repository/release URLs or `owner/repository` | Native prerelease metadata; drafts excluded |
 | Codeberg.org | Repository/release URLs | Previews included when enabled; drafts excluded |
 | GitLab.com | Project/release URLs, including nested subgroups | Common preview markers in tags |
-| D2RLoader (0.8.0 test builds) | Mod page or individual plugin API URL | Published releases only; common preview markers in versions |
+| D2RLoader | Mod page or individual plugin API URL | Published releases only; common preview markers in versions |
 
 ```text
 https://github.com/owner/app
@@ -18,6 +18,12 @@ https://gitlab.com/group/subgroup/app/-/releases
 ```
 
 Host identity is retained, so equal owner/project names on different hosts remain separate library entries.
+
+## Website downloads
+
+In Add App, paste the HTTPS page containing the download. A **Current download URL** field appears: paste the direct download link from that page. For example, use `https://framedropvr.com/` and `https://framedropvr.com/downloads/FrameDrop-Setup-1.0.37.exe`. GROUT matches the same download host, path and filename with a changing numeric version, chooses the highest version linked on the page, and uses the usual install/update methods. Relative links and a separate download host are supported.
+
+Both URLs are saved; edit them in App settings if the site changes. Scheduled checks fetch the page, not the installer. Checks fail visibly if no matching link remains. The download URL must contain one numeric version (such as 1.0.37); fixed latest URLs, dynamic query tokens and JavaScript-generated links are not supported. Page redirects must remain on the same host. Website downloads have no publisher checksum unless the source supplies one through a future integration. One tracked app per page is currently supported.
 
 ## Nexus Mods (disabled in public builds)
 
@@ -41,7 +47,7 @@ GitLab release asset links can have friendly labels; GROUT derives a filename wh
 
 ## Current limits
 
-- No private app repositories, self-hosted Gitea/Forgejo/GitLab servers, standalone download URLs or website scraping.
+- No private app repositories or self-hosted Gitea/Forgejo/GitLab servers. Website downloads require a public page with a versioned download link; JavaScript-only and fixed latest-download links are unsupported.
 - EXE, MSI and ZIP files have the update methods in the [user guide](user-guide.md#configure-future-updates). Formats such as MSIX, 7z and RAR require manual handling.
 - An EXE can be an installer or a portable app; choose its purpose yourself.
 - Source metadata redirects stay on the same API host. Download redirects reject HTTPS-to-HTTP downgrade, embedded credentials and obvious local/private literal addresses.

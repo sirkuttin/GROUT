@@ -6,7 +6,7 @@
 
 The updater your apps are missing.
 
-Great apps on Git repositories do not always include an updater. GROUT fills that gap on Windows: track apps you already have, or install new ones from releases on **GitHub, Codeberg.org and GitLab.com**. Local 0.8.0 builds also support [D2RLoader mods](docs/d2rloader.md).
+Great apps on Git repositories do not always include an updater. GROUT fills that gap on Windows: track apps you already have, or install new ones from releases on **GitHub, Codeberg.org and GitLab.com**. Also supports [D2RLoader mods](docs/d2rloader.md).
 
 **[Download GROUT.exe for Windows x64](https://github.com/sirkuttin/GROUT/releases/latest)** · [User guide](docs/user-guide.md) · [Report a bug](https://github.com/sirkuttin/GROUT/issues)
 
@@ -16,9 +16,11 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 > **Nexus Mods:** integration is under development and disabled in public builds pending application registration. See the [Nexus guide](docs/nexus-mods.md).
 
+GROUT also supports [website download tracking](docs/supported-sources.md#website-downloads) using a page URL and a versioned download link.
+
 ## What it does
 
-- **Watches releases** on GitHub, Codeberg and GitLab, plus D2RLoader in 0.8.0 test builds, with optional preview releases.
+- **Watches releases** on GitHub, Codeberg and GitLab, plus D2RLoader, with optional preview releases.
 - **Updates your way:** run an installer, replace a portable EXE, extract a ZIP, or download for manual installation.
 - **Tracks installed versions** from EXE metadata or manifests, with manual tracking when needed.
 - **Stays out of the way:** scheduled checks, tray notifications, quiet mode and optional start at sign-in.

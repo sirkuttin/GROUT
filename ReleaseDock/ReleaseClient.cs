@@ -44,6 +44,7 @@ public sealed class ReleaseClient : IDisposable
     public async Task VerifyRepository(string repo)
     {
         var reference = Repositories.Resolve(repo);
+        if (reference.IsWebsite) { using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30)); using var page = await Follow(new Uri(reference.WebUrl), HttpCompletionOption.ResponseHeadersRead, limit.Token, new Uri(reference.WebUrl).Host); page.EnsureSuccessStatusCode(); return; }
         if (reference.Host == "nexusmods.com") { await Nexus.Verify(reference); return; }
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var response = await Get(reference, reference.ApiUrl, timeout.Token);
@@ -51,9 +52,19 @@ public sealed class ReleaseClient : IDisposable
         response.EnsureSuccessStatusCode();
         if (reference.Host == "d2rloader.net") { using var mod = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token)); D2RLoader.Validate(mod.RootElement); }
     }
-    public async Task<Release> Latest(string repo, bool includePrereleases = false, long nexusFileId = 0)
+    public async Task<Release> Latest(string repo, bool includePrereleases = false, long nexusFileId = 0, string websiteDownloadUrl = "")
     {
         var reference = Repositories.Resolve(repo);
+        if (reference.IsWebsite)
+        {
+            WebsiteSource.Url(websiteDownloadUrl);
+            using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var page = await Follow(new Uri(reference.WebUrl), HttpCompletionOption.ResponseHeadersRead, limit.Token, new Uri(reference.WebUrl).Host); page.EnsureSuccessStatusCode();
+            if (page.Content.Headers.ContentLength > 2097152) throw new IOException("Website page is too large.");
+            using var stream = await page.Content.ReadAsStreamAsync(); using var memory = new MemoryStream(); var buffer = new byte[8192]; int count;
+            while ((count = await stream.ReadAsync(buffer, 0, buffer.Length, limit.Token)) > 0) { if (memory.Length + count > 2097152) throw new IOException("Website page is too large."); memory.Write(buffer, 0, count); }
+            return WebsiteSource.Parse(reference.WebUrl, websiteDownloadUrl, System.Text.Encoding.UTF8.GetString(memory.ToArray()));
+        }
         if (reference.Host == "nexusmods.com") return await Nexus.Latest(reference, nexusFileId);
         if (reference.Host == "d2rloader.net")
         {
@@ -120,7 +131,7 @@ public sealed class ReleaseClient : IDisposable
         using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token)); return D2RLoader.ParsePage(data.RootElement);
     }
     public static bool IsPreviewTag(string tag) => Regex.IsMatch(tag, @"(?:alpha|beta|preview|nightly|snapshot|rc|dev|pre)(?:[-_.]?\d+)?(?:$|[-_.])", RegexOptions.IgnoreCase);
-    private static void ValidateUrl(Uri uri, string? metadataHost = null)
+    internal static void ValidateUrl(Uri uri, string? metadataHost = null)
     {
         if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || uri.IsLoopback || uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Release links must use public HTTPS URLs without embedded credentials.");
         if (metadataHost != null && !uri.Host.Equals(metadataHost, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("The project API redirected outside its source host.");
@@ -148,7 +159,7 @@ public sealed class ReleaseClient : IDisposable
     public async Task Download(Asset asset, string destination, IProgress<double> progress, CancellationToken cancellation)
     {
         var downloadUrl = asset.OriginHost == "nexusmods.com" ? await Nexus.DownloadUrl(asset, cancellation) : asset.Url;
-        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0 || !uri.IsDefaultPort || (asset.OriginHost ?? "github.com") is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com" or "d2rloader.net") || (asset.OriginHost == null && uri.Host != "github.com")) throw new InvalidOperationException("Unexpected release download URL.");
+        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0 || !uri.IsDefaultPort || (asset.OriginHost ?? "github.com") is not ("github.com" or "codeberg.org" or "gitlab.com" or "nexusmods.com" or "d2rloader.net" or "website") || (asset.OriginHost == null && uri.Host != "github.com")) throw new InvalidOperationException("Unexpected release download URL.");
         var partial = destination + "." + Guid.NewGuid().ToString("N") + ".partial";
         try
         {

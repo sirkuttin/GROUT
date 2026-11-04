@@ -32,6 +32,9 @@ public sealed class SetupWindow : Window
     private TextBlock projectInfo = Ui.Text("");
     private StackPanel destinationPanel = new();
     private readonly TextBox repo = Ui.Input();
+    private readonly TextBox websiteDownload = Ui.Input();
+    private StackPanel websiteFields = new();
+    private string lookedUpDownload = "";
     private readonly CheckBox previews = Ui.Check("Include preview releases");
     private readonly RadioButton installed = new() { Content = "Track an app already installed", IsChecked = true, Foreground = System.Windows.Media.Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
     private readonly RadioButton fresh = new() { Content = "Install this app", Foreground = System.Windows.Media.Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
@@ -62,10 +65,11 @@ public sealed class SetupWindow : Window
         Closed += (_, _) => { closed = true; lookupTimer.Stop(); preparedZip?.Dispose(); };
         lookupTimer.Tick += async (_, _) => { lookupTimer.Stop(); if (firstScreen && !working && !closed) await Lookup(); };
         repo.TextChanged += (_, _) => { if (firstScreen) { if (nexusConnect != null) nexusConnect.Visibility = NexusMods.Enabled && repo.Text.IndexOf("nexusmods.com", StringComparison.OrdinalIgnoreCase) >= 0 ? Visibility.Visible : Visibility.Collapsed; lookupTimer.Stop(); lookupTimer.Start(); } };
+        websiteDownload.TextChanged += (_, _) => { if (firstScreen) { lookupTimer.Stop(); lookupTimer.Start(); } };
         previews.Click += (_, _) => { if (firstScreen) { lookupTimer.Stop(); lookupTimer.Start(); } };
         if (edit != null)
         {
-            Result = JsonSerializer.Deserialize<TrackedApp>(JsonSerializer.Serialize(edit))!; Result.Release = edit.Release; Result.Error = edit.Error;
+            Result = JsonSerializer.Deserialize<TrackedApp>(JsonSerializer.Serialize(edit))!; Result.Release = edit.Release; Result.Error = edit.Error; Result.VersionRecord = edit.VersionRecord;
             ScreenTwo();
         }
         else if (preview)
@@ -82,9 +86,14 @@ public sealed class SetupWindow : Window
         BeginPage();
         body.Children.Add(Ui.Text("ADD APP · 1 OF 2", 12, true));
         body.Children.Add(Ui.Text("Find your app", 28));
-        body.Children.Add(Ui.Text(NexusMods.Enabled ? "Paste a GitHub, Codeberg, GitLab.com, D2RLoader or Nexus Mods link." : "Paste a GitHub, Codeberg, GitLab.com or D2RLoader link.", muted: true));
-        repo.Text = Result.Repo; previews.IsChecked = Result.IncludePrereleases;
-        body.Children.Add(Ui.Text("Project link")); body.Children.Add(repo); body.Children.Add(previews);
+        body.Children.Add(Ui.Text(NexusMods.Enabled ? "Paste a GitHub, Codeberg, GitLab.com, D2RLoader or Nexus Mods link." : "Paste a project link or the website page containing an app download.", muted: true));
+        repo.Text = Result.Repo.StartsWith("website:", StringComparison.Ordinal) ? Result.RepositoryUrl : Result.Repo; previews.IsChecked = Result.IncludePrereleases;
+        body.Children.Add(Ui.Text("Project or website page URL")); body.Children.Add(repo);
+        websiteDownload.Text = Result.WebsiteDownloadUrl;
+        if (websiteDownload.Parent is Panel oldWebsitePanel) oldWebsitePanel.Children.Remove(websiteDownload);
+        websiteFields = new StackPanel { Visibility = Visibility.Collapsed }; websiteFields.Children.Add(Ui.Text("Current download URL")); websiteFields.Children.Add(websiteDownload);
+        websiteFields.Children.Add(Ui.Text("Paste the download link from this page. GROUT follows the same filename and finds newer version numbers.", muted: true)); body.Children.Add(websiteFields); body.Children.Add(previews);
+        System.Windows.Automation.AutomationProperties.SetName(websiteDownload, "Current download URL");
         projectInfo = Ui.Text("The project and latest release will appear here.", muted: true); body.Children.Add(projectInfo);
         body.Children.Add(Ui.Text("What would you like to do?", 18));
         installed.IsChecked = !newInstall; fresh.IsChecked = newInstall;
@@ -101,10 +110,10 @@ public sealed class SetupWindow : Window
             lookupTimer.Stop();
             try
             {
-                var parsed = Repositories.Parse(repo.Text);
+                var parsed = WebsiteSource.SourceKey(repo.Text);
                 if (existing.Contains(parsed)) { ExistingRepo = parsed; DialogResult = true; return; }
-                if (lookedUpRepo != parsed || lookedUpChannel != (previews.IsChecked == true)) await Lookup();
-                if (closed || verifiedRepo != parsed || Repositories.Parse(repo.Text) != parsed) return;
+                if (lookedUpDownload != websiteDownload.Text.Trim() || lookedUpRepo != parsed || lookedUpChannel != (previews.IsChecked == true)) await Lookup();
+                if (closed || verifiedRepo != parsed || WebsiteSource.SourceKey(repo.Text) != parsed) return;
                 var wantsNew = fresh.IsChecked == true;
                 if (wantsNew && !newInstall) { SetupPaths.ClearExistingTracking(Result); methodChosen = false; installerCompletion = false; }
                 newInstall = wantsNew;
@@ -121,23 +130,25 @@ public sealed class SetupWindow : Window
         if (working || closed) return;
         working = true;
         if (nextButton != null) nextButton.IsEnabled = false;
-        var input = repo.Text; var channel = previews.IsChecked == true;
+        var input = repo.Text; var seedInput = websiteDownload.Text.Trim(); var channel = previews.IsChecked == true;
         try
         {
-            var parsed = Repositories.Parse(input);
+            var parsed = WebsiteSource.SourceKey(input);
+            var websiteSource = Repositories.Resolve(parsed).IsWebsite; websiteFields.Visibility = websiteSource ? Visibility.Visible : Visibility.Collapsed;
+            if (websiteSource && websiteDownload.Text.Trim().Length == 0) { verifiedRepo = ""; projectInfo.Text = "Paste the current download URL from this website."; return; }
             var nexusSource = Repositories.Resolve(parsed).Host == "nexusmods.com";
             if (nexusSource && !NexusMods.Enabled) throw new InvalidOperationException("Nexus Mods support is not available in this release yet.");
-            previews.Visibility = nexusSource ? Visibility.Collapsed : Visibility.Visible;
-            message.Text = nexusSource ? "Nexus uses the file you choose rather than a release channel. Connect your account to check versions. ZIP extraction is supported; mod dependencies and FOMOD installers are not." : "Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.";
+            previews.Visibility = nexusSource || websiteSource ? Visibility.Collapsed : Visibility.Visible;
+            message.Text = websiteSource ? "GROUT checks this page for links matching your download filename, with a newer version number. Choose an EXE installer or portable file on the next screen." : nexusSource ? "Nexus uses the file you choose rather than a release channel. Connect your account to check versions. ZIP extraction is supported; mod dependencies and FOMOD installers are not." : "Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.";
             if (existing.Contains(parsed)) { projectInfo.Text = "Already in your library. Choose Open app."; nextButton!.Content = "Open app"; return; }
             nextButton!.Content = "Next →";
             projectInfo.Text = "Finding app…";
             if (verifiedRepo != parsed) { verifiedRepo = ""; await github.VerifyRepository(parsed); verifiedRepo = parsed; }
             if (Result.Repo.Length > 0 && !Result.Repo.Equals(parsed, StringComparison.OrdinalIgnoreCase)) { Result = new(); installAttempted = false; methodChosen = false; installerCompletion = false; }
-            Result.Repo = parsed; Result.IncludePrereleases = channel; Result.Release = null; Result.Latest = "";
+            Result.Repo = parsed; Result.WebsiteDownloadUrl = websiteSource ? seedInput : ""; Result.IncludePrereleases = channel; Result.Release = null; Result.Latest = "";
             try
             {
-                var release = await github.Latest(parsed, channel);
+                var release = await github.Latest(parsed, channel, websiteDownloadUrl: Result.WebsiteDownloadUrl);
                 Result.Release = release; Result.Latest = release.Tag; Result.CheckedAt = DateTimeOffset.UtcNow; Result.Error = "";
                 var source = Repositories.Resolve(parsed);
                 projectInfo.Text = $"{source.Name} · {source.Path}\nLatest: {release.Tag}\n{AssetCompatibility.Candidates(release.Assets).Count} Windows candidate download(s)" + (source.Host == "gitlab.com" ? "\nGitLab preview releases are identified by tags such as beta, rc or preview." : "");
@@ -145,14 +156,14 @@ public sealed class SetupWindow : Window
                 if (release.SourceWarning.Length > 0) projectInfo.Text += "\n\n" + release.SourceWarning;
             }
             catch (Exception ex) { Result.Error = ex.Message; projectInfo.Text = parsed + "\n" + ex.Message + "\nYou can still track an existing installation manually."; }
-            lookedUpRepo = parsed; lookedUpChannel = channel;
+            lookedUpDownload = seedInput; lookedUpRepo = parsed; lookedUpChannel = channel;
         }
         catch (Exception ex) { projectInfo.Text = ex.Message; lookedUpRepo = ""; }
         finally
         {
             working = false;
             if (nextButton != null) nextButton.IsEnabled = true;
-            if (!closed && firstScreen && (input != repo.Text || channel != (previews.IsChecked == true))) { lookedUpRepo = ""; lookupTimer.Start(); }
+            if (!closed && firstScreen && (input != repo.Text || seedInput != websiteDownload.Text.Trim() || channel != (previews.IsChecked == true))) { lookedUpRepo = ""; lookupTimer.Start(); }
         }
     }
     private void ScreenTwo()
@@ -183,6 +194,7 @@ public sealed class SetupWindow : Window
                     if (existing.Contains(source)) throw new InvalidOperationException("That repository is already tracked. Choose its existing library entry instead.");
                     message.Text = "Checking the new repository…"; await github.VerifyRepository(source);
                 }
+                if (Repositories.Resolve(source).IsWebsite) { message.Text = "Checking website download…"; await github.Latest(source, websiteDownloadUrl: editor.WebsiteDownloadUrl); }
                 editor.Save(); working = false; completed = true; DialogResult = true;
             }
             catch (Exception ex) { message.Text = ex.Message; }
@@ -370,7 +382,7 @@ public sealed class SetupWindow : Window
             {
                 candidates.Children.Clear();
                 foreach (var candidate in Result.InstallCandidates)
-                    candidates.Children.Add(Ui.Button("Use " + candidate.Label, (_, _) => { InstallDiscovery.Apply(Result, candidate); completed = true; DialogResult = true; }));
+                    candidates.Children.Add(Ui.Button("Use " + candidate.Label, (_, _) => { InstallDiscovery.Apply(Result, candidate); if (string.IsNullOrWhiteSpace(candidate.Entry.Version)) InstalledVersions.RecordInstallerWithoutVersion(Result, candidate.Entry.Id); completed = true; DialogResult = true; }));
             }
             ShowCandidates();
             body.Children.Add(Ui.Button("Find installation", async (_, _) =>
@@ -382,6 +394,7 @@ public sealed class SetupWindow : Window
                     if (InstallDiscovery.ClearMatch(Result.InstallCandidates) is { } match)
                     {
                         InstallDiscovery.Apply(Result, match);
+                        if (match.Changed && string.IsNullOrWhiteSpace(match.Entry.Version)) InstalledVersions.RecordInstallerWithoutVersion(Result, match.Entry.Id);
                         if (InstallDiscovery.CanFinish(Result)) { working = false; completed = true; DialogResult = true; return; }
                     }
                     discoveryInfo.Text = Result.InstallCandidates.Count > 0 ? "Choose the matching installation below." : "No matching registered installation found. Choose its folder or EXE below."; ShowCandidates();
@@ -398,7 +411,7 @@ public sealed class SetupWindow : Window
         version.TextChanged += (_, _) => { if (version.IsKeyboardFocusWithin) automatic.IsChecked = false; };
         message = Ui.Text("", muted: true);
         var row = new WrapPanel(); row.Children.Add(Ui.Button("← Back", (_, _) => { installerCompletion = false; NewInstallScreen(); }));
-        row.Children.Add(Ui.Button("Add to library", (_, _) => { Result.InstallLocation = location.Text.Trim(); Result.Installed = version.Text.Trim(); Result.AutoReconcile = automatic.IsChecked == true; if (Result.AutoReconcile) InstalledVersions.Reconcile(Result); completed = true; DialogResult = true; }));
+        row.Children.Add(Ui.Button("Add to library", (_, _) => { Result.InstallLocation = location.Text.Trim(); Result.Installed = version.Text.Trim(); Result.AutoReconcile = automatic.IsChecked == true; if (Result.AutoReconcile) InstalledVersions.Reconcile(Result); if (Result.PendingInstallerRelease == Result.Latest && version.Text.Trim().Length == 0) InstalledVersions.RecordInstallerWithoutVersion(Result); completed = true; DialogResult = true; }));
         FixedFooter(row);
     }
     private void PickLocation(bool file)

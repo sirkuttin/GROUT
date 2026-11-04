@@ -77,7 +77,7 @@ public static class InstallDiscoveryTests
             var wizard = new SetupWindow(client, [], updatePrompts: prompts, newWork: Work, discovery: discovery) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
             try
             {
-                Find<TextBox>(wizard).Single().Text = app.Repo;
+                Find<TextBox>(wizard).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = app.Repo;
                 Find<RadioButton>(wizard).Single(r => Equals(r.Content, "Install this app")).IsChecked = true;
                 Find<Button>(wizard).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 for (var i = 0; i < 100 && !Find<Button>(wizard).Any(b => Equals(b.Content, "Choose how to use this EXE")); i++) await Task.Delay(20);

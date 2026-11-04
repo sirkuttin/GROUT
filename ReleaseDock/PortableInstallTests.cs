@@ -37,7 +37,7 @@ public static class PortableInstallTests
     }
     private static async Task StartNew(SetupWindow window)
     {
-        Find<TextBox>(window).Single().Text = "test/portable";
+        Find<TextBox>(window).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "test/portable";
         Find<RadioButton>(window).Single(r => Equals(r.Content, "Install this app")).IsChecked = true;
         Button(window, "Next →").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         await Until(() => Find<Button>(window).Any(b => Equals(b.Content, "Choose how to use this EXE")));
@@ -80,7 +80,7 @@ public static class PortableInstallTests
                 Check(window.Result.UpdateTarget == target && Button(window, "Save and add app").IsEnabled, "Folder derives exact EXE target and enables save");
                 Check(FinishDialog(window, "Save and add app") == true, "Actual portable save finishes dialog successfully");
                 Check(File.ReadAllBytes(target).SequenceEqual(PortableExeFixture.Bytes()) && reviewCalls == 0, "New EXE is saved without launching or unnecessary overwrite review");
-                Check(window.Result.Installed == "v1.2.12" && !window.Result.AutoReconcile && window.Result.IsCurrent, "EXE without metadata records applied release without false update");
+                Check(window.Result.Installed == "v1.2.12" && window.Result.AutoReconcile && window.Result.VersionRecord != null && window.Result.IsCurrent, "EXE without metadata records applied release without false update");
                 Check(window.Result.InstalledProvenance.Contains("Saved from GitHub release"), "Applied-release tracking has explicit provenance");
                 var store = new Store(Path.Combine(root, "library", "apps.json")); store.Save([window.Result]);
                 Check(store.Load().Single().InstallLocation == target && store.Load().Single().IsCurrent, "Completed result adds to persistent library with correct exact file");
@@ -113,7 +113,7 @@ public static class PortableInstallTests
             var intent = new SetupWindow(github, [], updatePrompts: prompts, newWork: Work);
             try
             {
-                Find<TextBox>(intent).Single().Text = "test/portable";
+                Find<TextBox>(intent).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "test/portable";
                 Button(intent, "Next →").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 await Until(() => Find<Button>(intent).Any(b => Equals(b.Content, "Add App")));
                 intent.Result.Installed = "1.0.36.0"; intent.Result.InstallLocation = @"C:\OtherApp.exe";
@@ -129,12 +129,12 @@ public static class PortableInstallTests
             var changed = new SetupWindow(github, [], updatePrompts: prompts, newWork: Work);
             try
             {
-                Find<TextBox>(changed).Single().Text = "test/first";
+                Find<TextBox>(changed).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "test/first";
                 Button(changed, "Next →").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 await Until(() => Find<Button>(changed).Any(b => Equals(b.Content, "Add App")));
                 Input(changed, "Manual installed version").Text = "1.0.36.0";
                 Button(changed, "← Back").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-                Find<TextBox>(changed).Single().Text = "test/second";
+                Find<TextBox>(changed).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = "test/second";
                 Button(changed, "Next →").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 await Until(() => Find<Button>(changed).Any(b => Equals(b.Content, "Add App")));
                 Check(changed.Result.Repo == "test/second" && changed.Result.Installed == "" && Input(changed, "Manual installed version").Text == "", "Changing repository does not carry previous version fields");

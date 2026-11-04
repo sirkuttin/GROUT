@@ -288,3 +288,15 @@
 - Record installed nested manifest and owned mod subfolder so version detection and uninstall stay scoped correctly under a shared plugins destination.
 - Added API q search with Enter/Search, page-one reset, query-preserving paging and clearing. Live q=stash metadata returned results. Tests drive the actual browser search/page/clear flow with simulated responses.
 - Fixed existing-app detection for manifest names without a v marker (d2rl-auto-deposit-0.1.4). Verified the actual local manifest read-only; its numeric version 2 is schema metadata. Packaged regression suite passes, including 59 D2RLoader assertions and existing-app setup detection.
+
+## 0.9.0 Website download sources
+- User requested a website page URL plus current download URL, using FrameDrop as the first example. Added an explicitly persisted website source and template, Add App guidance and editable settings.
+- Matches HTML anchor links by exact download host/path/query with one changing numeric version; chooses highest numeric version. Reuses scheduling, installation, portable ZIP/EXE updates and asset family matching.
+- Rejects private/literal local URLs, credentials, unsafe redirects, missing/ambiguous matches, unversioned downloads and oversized pages. Does not run JavaScript or guess new URLs. Existing provider parsing remains strict.
+- FrameDrop public HTML verified separately. Automatic approval review blocked the live GROUT diagnostic launch without a stated reason; simulated client and wizard checks exercise website flow.
+
+## 0.9.0 Fallback installation version records
+- User requested automatic release-version fallback after ZIP extraction, EXE copying and full installation when the app supplies no readable version. Store separate small JSON records under GROUT LocalAppData versions/, never inside managed apps.
+- Save only after successful file application or successful installer return plus installed-file evidence. Missing files still alert; failed/cancelled installs retain the previous record. Reuse one record per tracked app and clean it when native detection resumes, source/location changes, or the app is removed.
+- Remember unchanged stale native sources so an old manifest left behind by a new ZIP does not overwrite the applied-release version. Native versions are adopted again once their source changes.
+- Packaged suite passes 15 new version-record checks plus all existing checks, including ZIP updates, restart/persistence, failed ZIP/install operations, metadata-free EXEs/installers, native version recovery and record cleanup.

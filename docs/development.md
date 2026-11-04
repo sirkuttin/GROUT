@@ -98,3 +98,9 @@ The generator uses pinned `System.Drawing.Common` tooling and emits 16, 24, 32, 
 The app uses Windows Framework assemblies only. FrameworkJson maps the existing JSON format through the built-in parser, preserving ISO dates, 64-bit identifiers, records and ignored runtime-only fields. FrameworkSupport supplies process waiting, argument quoting, SHA-256 and atomic file replacement. FolderDialogs uses the Windows Common Item Dialog. ArchiveChecksums reads central-directory CRCs because Framework's ZIP entry API does not expose them. Portable EXE header validation remains enabled.
 
 The packaged suite includes old-format data and updater plans, strict JSON types, Unicode/date roundtrips, native folder-dialog configuration, ZIP corruption/path checks, portable EXE checks, and isolated updater restart/rollback scenarios.
+
+Website source diagnostic (reads the page, never installs or modifies the library):
+
+```powershell
+GROUT.exe --check-website https://framedropvr.com/ https://framedropvr.com/downloads/FrameDrop-Setup-1.0.37.exe website-report.txt
+```

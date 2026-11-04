@@ -129,7 +129,7 @@ internal static class NexusTests
             try
             {
                 Find<System.Windows.Controls.RadioButton>(wizard).Single(b => Equals(b.Content, "Install this app")).IsChecked = true;
-                Find<System.Windows.Controls.TextBox>(wizard).Single().Text = link;
+                Find<System.Windows.Controls.TextBox>(wizard).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Project link").Text = link;
                 Find<System.Windows.Controls.Button>(wizard).Single(b => Equals(b.Content, "Next →")).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 for (var i = 0; i < 100 && !Find<System.Windows.Controls.Button>(wizard).Any(b => Equals(b.Content, "Open Nexus download")); i++) await Task.Delay(20);
                 Check(Find<System.Windows.Controls.Button>(wizard).Any(b => Equals(b.Content, "Open Nexus download")), "Free-account install flow opens the browser instead of requesting a direct download");

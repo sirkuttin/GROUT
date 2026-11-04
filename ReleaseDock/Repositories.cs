@@ -4,18 +4,19 @@ namespace ReleaseDock;
 
 public sealed record RepositoryRef(string Host, string Path)
 {
-    public string Name => Host switch { "d2rloader.net" => "D2RLoader", "codeberg.org" => "Codeberg", "gitlab.com" => "GitLab", "nexusmods.com" => "Nexus Mods", _ => "GitHub" };
-    public string WebUrl => $"https://{Host}/{Path}";
-    public string Key => Host == "github.com" ? Path : WebUrl;
-    public string ReleasesUrl => Host == "d2rloader.net" ? WebUrl : Host == "nexusmods.com" ? WebUrl + "?tab=files" : WebUrl + (Host == "gitlab.com" ? "/-/releases" : "/releases");
-    public string ApiUrl => Host switch { "d2rloader.net" => "https://d2rloader.net/api/v1/" + Path, "nexusmods.com" => "https://api.nexusmods.com/v1/games/" + Path.Split('/')[0] + "/mods/" + Path.Split('/')[2], "codeberg.org" => $"https://codeberg.org/api/v1/repos/{Path}", "gitlab.com" => "https://gitlab.com/api/v4/projects/" + Uri.EscapeDataString(Path), _ => $"https://api.github.com/repos/{Path}" };
+    public bool IsWebsite => Host == "website";
+    public string Name => Host switch { "website" => "Website", "d2rloader.net" => "D2RLoader", "codeberg.org" => "Codeberg", "gitlab.com" => "GitLab", "nexusmods.com" => "Nexus Mods", _ => "GitHub" };
+    public string WebUrl => IsWebsite ? Path : $"https://{Host}/{Path}";
+    public string Key => IsWebsite ? "website:" + Path : Host == "github.com" ? Path : WebUrl;
+    public string ReleasesUrl => IsWebsite ? WebUrl : Host == "d2rloader.net" ? WebUrl : Host == "nexusmods.com" ? WebUrl + "?tab=files" : WebUrl + (Host == "gitlab.com" ? "/-/releases" : "/releases");
+    public string ApiUrl => IsWebsite ? WebUrl : Host switch { "d2rloader.net" => "https://d2rloader.net/api/v1/" + Path, "nexusmods.com" => "https://api.nexusmods.com/v1/games/" + Path.Split('/')[0] + "/mods/" + Path.Split('/')[2], "codeberg.org" => $"https://codeberg.org/api/v1/repos/{Path}", "gitlab.com" => "https://gitlab.com/api/v4/projects/" + Uri.EscapeDataString(Path), _ => $"https://api.github.com/repos/{Path}" };
 }
 
 public static class Repositories
 {
     public static RepositoryRef Resolve(string input)
     {
-        input = input.Trim(); if (input.StartsWith("www.nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("d2rloader.net/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("www.d2rloader.net/", StringComparison.OrdinalIgnoreCase)) input = "https://" + input; var host = "github.com";
+        input = input.Trim(); if (input.StartsWith("website:", StringComparison.Ordinal)) return new("website", WebsiteSource.Url(input.Substring(8)).AbsoluteUri); if (input.StartsWith("www.nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("nexusmods.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("d2rloader.net/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("www.d2rloader.net/", StringComparison.OrdinalIgnoreCase)) input = "https://" + input; var host = "github.com";
         if (!input.Contains("://") && (input.StartsWith("codeberg.org/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("gitlab.com/", StringComparison.OrdinalIgnoreCase) || input.StartsWith("github.com/", StringComparison.OrdinalIgnoreCase))) input = "https://" + input;
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri))
         {
