@@ -37,7 +37,6 @@ public partial class App : Application
         }
         if (e.Args.Length > 0 && e.Args is not ["--tray"] && !selfRestart)
         {
-            if (e.Args is ["--preview-d2rloader", var d2rOutput]) { D2RLoaderTests.Preview(d2rOutput); Shutdown(); return; }
             if (e.Args is ["--preview-zip-selection", var zipOutput]) { ZipSelectionTests.Preview(zipOutput); Shutdown(); return; }
             if (e.Args is ["--check-self-update", var selfReport])
             {
@@ -76,11 +75,11 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {VersionRecordTests.Assertions} version record, {WebsiteSourceTests.Assertions} website, {D2RLoaderTests.Assertions} D2RLoader, {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {TreeMoveTests.Assertions} tree move, {DownloadChoiceTests.Assertions} download recovery, {LibraryOrganizationTests.Assertions} library organization, {VersionRecordTests.Assertions} version record, {WebsiteSourceTests.Assertions} website, {D2RLoaderTests.Assertions} D2RLoader, {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }
-            if (e.Args is ["--preview" or "--preview-missing" or "--preview-nexus", var output])
+            if (e.Args is ["--preview" or "--preview-missing" or "--preview-nexus" or "--preview-mods" or "--preview-tree-drag" or "--preview-collapsed", var output])
             {
                 var window = new MainWindow(true);
                 if (e.Args[0] == "--preview-nexus")
@@ -101,10 +100,33 @@ public partial class App : Application
                     sample.LocalStatus = "The saved app location no longer exists: C:\\Apps\\Gram\\Gram.exe";
                     library.SelectedItem = null; library.SelectedItem = sample; library.Items.Refresh();
                 }
+                if (e.Args[0] is "--preview-mods" or "--preview-tree-drag") window.PreviewModLibrary();
+                if (e.Args[0] == "--preview-collapsed") window.PreviewCollapsedGroups();
                 window.Show();
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                if (e.Args[0] == "--preview-tree-drag") { window.PreviewTreeDropCue(); await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Render); }
                 SavePreview(window, output);
                 window.Close(); Shutdown(); return;
+            }
+            if (e.Args is ["--tree-drag-test-host"])
+            {
+                var window = new MainWindow(true); window.PreviewModLibrary(); window.Title = "GROUT — isolated drag test";
+                window.Closed += (_, _) => Shutdown(); window.Show(); return;
+            }
+            if (e.Args is ["--preview-menu", var menuOutput])
+            {
+                var window = Ui.Window("Menu preview", 600, 500); window.Show();
+                var menu = new System.Windows.Controls.ContextMenu { PlacementTarget = window };
+                foreach (var label in new[] { "Add app here…", "Add mod here…", "New group here…", "Name, parent and child folder…", "Stop tracking" }) menu.Items.Add(new System.Windows.Controls.MenuItem { Header = label });
+                ((System.Windows.Controls.MenuItem)menu.Items[2]).IsEnabled = false; menu.IsOpen = true;
+                await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle); ((System.Windows.Controls.MenuItem)menu.Items[4]).Focus(); menu.UpdateLayout();
+                SavePreview(menu, menuOutput); menu.IsOpen = false; window.Close(); Shutdown(); return;
+            }
+            if (e.Args is ["--preview-mod-setup", var modSetupOutput])
+            {
+                var group = new TrackedApp { IsGroup = true, CustomName = "D2R" }; var parent = new TrackedApp { ParentId = group.Id, CustomName = "Reimagined", Repo = "test/reimagined", DefaultChildFolder = @"D:\Games\D2R\d2rloader" };
+                using var client = new ReleaseClient(); var window = new SetupWindow(client, [], preview: true, previewStage: "mod", trackedApps: [group, parent], parentId: parent.Id, childDefaultFolder: parent.DefaultChildFolder);
+                window.Show(); await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle); SavePreview(window, modSetupOutput); window.Close(); Shutdown(); return;
             }
             if (e.Args is ["--preview-setup", var setupOutput])
             {
@@ -133,7 +155,7 @@ public partial class App : Application
                 window.Close(); Shutdown(); return;
             }
             var help = e.Args is ["--help"] or ["-h"];
-            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-d2rloader PNG_PATH | --preview-zip-selection PNG_PATH | --preview-nexus PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-website PAGE_URL DOWNLOAD_URL REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
+            MessageBox.Show("GROUT\n\nUsage: GROUT.exe [--help | --tray | --self-test REPORT_PATH | --preview PNG_PATH | --preview-menu PNG_PATH | --preview-mods PNG_PATH | --preview-tree-drag PNG_PATH | --preview-collapsed PNG_PATH | --tree-drag-test-host | --preview-mod-setup PNG_PATH | --preview-zip-selection PNG_PATH | --preview-nexus PNG_PATH | --preview-missing PNG_PATH | --preview-setup PNG_PATH | --preview-app-settings PNG_PATH | --preview-setup-first PNG_PATH | --preview-install PNG_PATH | --preview-portable PNG_PATH | --check-self-update REPORT_PATH | --check-website PAGE_URL DOWNLOAD_URL REPORT_PATH | --check-repo PROJECT_LINK_OR_OWNER/REPO REPORT_PATH | --detect-installed LOCATION REPORT_PATH | --find-installation PROJECT_LINK REPORT_PATH]\n\nTray starts hidden. Preview commands use sample data. Check-repo diagnoses public releases including previews. Detect-installed reads local versions. Find-installation reads matching Windows installed-app registrations. Both leave your library unchanged. Launch without flags for the app. Unknown flags are rejected.", help ? "GROUT help" : "Invalid arguments");
             Shutdown(help ? 0 : 2); return;
         }
         instance = new Mutex(true, @"Local\ReleaseDock-" + Environment.UserName, out var first);
@@ -147,7 +169,7 @@ public partial class App : Application
             else Shutdown(1);
         }
     }
-    internal static void SavePreview(Window window, string output)
+    internal static void SavePreview(FrameworkElement window, string output)
     {
         window.UpdateLayout();
         var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);

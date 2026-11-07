@@ -300,3 +300,50 @@
 - Save only after successful file application or successful installer return plus installed-file evidence. Missing files still alert; failed/cancelled installs retain the previous record. Reuse one record per tracked app and clean it when native detection resumes, source/location changes, or the app is removed.
 - Remember unchanged stale native sources so an old manifest left behind by a new ZIP does not overwrite the applied-release version. Native versions are adopted again once their source changes.
 - Packaged suite passes 15 new version-record checks plus all existing checks, including ZIP updates, restart/persistence, failed ZIP/install operations, metadata-free EXEs/installers, native version recovery and record cleanup.
+
+## 0.10.0 Library and mod installation organization
+- User accepted the designer's recommendation to keep GROUT as one app and start implementation. Added Library / Updates / Browse navigation, Applications / Mods filters, search and named mod-target selection.
+- D2RLoader browsing moved out of general Add App. URLs still auto-detect. Mods show their installation name/scope and exact folder beside update controls; setup/settings use mod wording and allow classifying non-D2RLoader sources.
+- Existing records remain intact and D2RLoader entries are recognized as mods without inventing a named target. Same-source mods at distinct destinations are independent; source/destination duplicates are rejected before managed file application.
+- New mod ZIP installations use the exact selected destination, while application ZIPs keep the app-subfolder behavior. Target names/scopes are organization metadata, not inferred deployment rules.
+- Packaged regressions and actual modal Add mod flow cover independent installations, filters, migration, persistence and destination validation. Rendered mod-library preview inspected; corrected filter text contrast.
+
+## Download selection and unnamed mod clarity
+- User reported confusing Choose release download and Target not named / Custom messages. Read-only diagnosis found saved Reimagined ZIP 3.1.0 versus latest 3.1.1.R17. Added narrow terminal revision matching, preserving edition/platform tokens and ambiguous-match rejection.
+- Unmatched downloads have attention styling, a specific explanation and enabled Choose download action with a focused compatible-file picker. Saving a choice does not start installation. Missing compatible files explain release-page/settings recovery instead.
+- Removed internal unnamed-target/Custom placeholders. Legacy mods show their actual folder; naming is optional and named entries show their label without scope jargon. Existing files/library were not modified during diagnosis.
+
+## Hierarchy decision — 2026-11-06
+- User confirmed D2R → Reimagined → Auto Deposit / Remote Stash means the two mods under the existing tracked Reimagined installation. Designer recommends user-managed parent/child library instead of workspace/filter layers. Parent names remain independent of physical paths; optional default folders apply only when adding new children. Reparenting does not move files.
+
+## Hierarchy implementation and primary installation records — 2026-11-06
+- UX designer reviewed user screenshots, provisional workspace layout, actual tree render and add/install semantics. User-managed tree supersedes both the first filter layout and interim Apps/Mods workspace design. Implemented stable node IDs/ParentId, organizers and tracked parents, expand/collapse, search/updates-only, explicit Add here/parent breadcrumb, parent selection with breadcrumbs, and optional defaults for new children only.
+- Name/parent changes never move files. Group or tracking removal promotes children; physical parent removal checks overlapping tracked destinations. Existing library entries are preserved at root until user organizes them. No source-based automatic grouping or file migration.
+- User superseded the earlier fallback/delete policy: ALWAYS record successfully applied releases, use that as primary truth and retain native metadata as supporting evidence. JSON records stay in GROUT AppData. New ZIPs with stale modinfo.json now record the actual applied release. Reformatting unchanged native versions cannot downgrade that applied version. Records retain applied provenance when native changes or manual confirmation updates the current version.
+- Packaged regression suite covers retained records, stale metadata and failed installs, parent/child persistence, cycle prevention, removal boundaries and actual Add flow. Designer blockers addressed: visible Add here on tracked parents, parent breadcrumb on Add screens, and distinguishable parent choices.
+
+## Menu contrast fix
+- User screenshot exposed white text on the Windows light context-menu surface. Added explicit dark menu surfaces, readable header text, highlighted and disabled states for both Add and library context menus. Rendered the actual popup to check contrast.
+
+## Drag-and-drop tree organization
+- User requested arbitrary sidebar order and easy parent/child moves. Added persisted per-parent order, internal tree drag/drop, before/after/inside cues, top-level blank-space drop, hover expansion and edge scrolling. Moving a branch retains its children and never changes installed paths or version records.
+- Reject self/descendant cycles, external data and scrollbar drop zones. Cancel leaves ordering unchanged. Parent removal promotes children in place without reshuffling other siblings; uninstall save failures restore prior parent/order metadata.
+- Regression coverage includes initial-order migration, manual reordering, branch moves, invalid-drop nonmutation, persistence, unchanged installation state and the shared UI drop operation. Background refresh is deferred during an active drag.
+
+## Child reordering interaction fix
+- User could not arrange sibling children. Reproduced the interaction mismatch in an isolated live sample: thin row edges reordered correctly, but dragging normal labels hit the large nesting zone. Ordinary leaf labels now reorder in the movement direction; nesting uses an explicit, visibly marked Inside area. Containers retain their normal middle drop region.
+- Added actual rendered-row hit tests for edge padding, upward/downward sibling label drops and explicit Inside. Verified real mouse drags downward, upward and into a new parent through the computer-use runtime against the sample-only host. Real library was read but never changed.
+- Added a sample-only --tree-drag-test-host flag for repeatable manual gesture testing. Also corrected tooltip contrast observed during that test.
+
+## Detail action row simplification
+- User requested Settings instead of App/Mod settings and removal of the Organize and Add here buttons from tracked-item details. Applied to both apps and mods. Tree context-menu actions remain available.
+
+## Collapsed branch status summaries
+- User requested All up to date / N updates on collapsed parents. Added recursive counts of tracked items, updates and issues across all descendants and the tracked parent itself. Organizers are not counted as installs; filtering does not hide underlying branch issues.
+- Sidebar summary is separate from the selected item detail status, so a current parent does not acquire a misleading enabled-update claim for a child. Added regression checks for nested counts, fully current branches, parent updates and failed checks.
+
+- Corrected summary visibility per explicit user instruction: collapsed parents only. Expanded organizers have no summary; tracked parents retain their own normal status.
+
+## 0.10.0 public release preparation
+- User requested hiding D2RLoader browse buttons/features before publishing. Removed catalog discovery from main toolbar, tree menus, public preview command and user documentation. Individual mod URLs and existing managed installations continue working. Nexus remains disabled.
+- Publishing the reviewed hierarchy, tree drag/drop, collapsed summaries, clearer download selection and permanent applied-release records as 0.10.0.

@@ -3,7 +3,7 @@ using ReleaseDock.Json;
 
 namespace ReleaseDock;
 
-public sealed record InstalledReleaseRecord(string Source, string Version, string Location, string Method, string[] Files, DateTimeOffset AppliedAt, string IgnoredSource = "", string IgnoredHash = "", string RegistrationId = "");
+public sealed record InstalledReleaseRecord(string Source, string Version, string Location, string Method, string[] Files, DateTimeOffset AppliedAt, string IgnoredSource = "", string IgnoredHash = "", string RegistrationId = "", string NativeVersion = "", string AppliedVersion = "", string Evidence = "Applied");
 
 public static class InstalledReleaseRecords
 {
@@ -14,11 +14,11 @@ public static class InstalledReleaseRecords
         if (app.Latest.Length == 0 || app.InstallLocation.Length == 0) throw new InvalidOperationException("An installed location and applied release are required for version tracking.");
         var installed = files.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (installed.Length == 0) throw new InvalidOperationException("No installed app files were found to record.");
-        var ignored = ""; var hash = "";
-        try { ignored = InstalledVersions.Read(app.InstallLocation, InstalledVersions.UsesD2RLoaderManifest(app)).Source; hash = Fingerprint(ignored); }
+        var ignored = ""; var hash = ""; var native = "";
+        try { var found = InstalledVersions.Read(app.InstallLocation, InstalledVersions.UsesD2RLoaderManifest(app)); ignored = found.Source; native = found.Version; hash = Fingerprint(ignored); }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException or UnauthorizedAccessException or JsonException or System.ComponentModel.Win32Exception) { }
         if (!Guid.TryParseExact(app.VersionRecordId, "N", out _)) app.VersionRecordId = Guid.NewGuid().ToString("N");
-        app.VersionRecord = new(app.Repo, app.Latest, Path.GetFullPath(app.InstallLocation), app.UpdateMethod, installed, DateTimeOffset.UtcNow, ignored, hash, registrationId);
+        app.VersionRecord = new(app.Repo, app.Latest, Path.GetFullPath(app.InstallLocation), app.UpdateMethod, installed, DateTimeOffset.UtcNow, ignored, hash, registrationId, native, app.Latest);
         app.Installed = app.Latest; app.AutoReconcile = true; app.LocalError = false; app.InstallationMissing = false;
         app.InstalledProvenance = "Saved from " + (app.Repo.Length > 0 ? Repositories.Resolve(app.Repo).Name : "app") + " release " + app.Latest + ". Version recorded by GROUT after installation.";
         app.LocalStatus = app.InstalledProvenance; app.UpdateState = "";

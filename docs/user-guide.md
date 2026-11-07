@@ -64,9 +64,9 @@ Temporary rollback copies protect a file update internally while it is applied; 
 
 ## Installed versions
 
-Successful ZIP extraction, portable EXE copying and located installer installations can use a GROUT installation record when no usable version is supplied. The record stores the applied release and installed file paths under `%LOCALAPPDATA%\ReleaseDock\versions`; GROUT does not create or alter a publisher manifest in the app folder. It updates this small JSON record after each successful installation. A failed or cancelled operation does not advance the recorded version, and missing app files still produce an alert.
+Successful ZIP extraction, portable EXE copying and located installer installations always create a GROUT installation record after success. The record stores the applied release and installed file paths under `%LOCALAPPDATA%\ReleaseDock\versions`; GROUT does not create or alter a publisher manifest in the app folder. It updates this small JSON record after each successful installation. A failed or cancelled operation does not advance the recorded version, and missing app files still produce an alert.
 
-When a real EXE/manifest version becomes readable again, GROUT resumes normal detection and deletes its fallback record on save. An unchanged stale manifest left by an earlier ZIP does not override the newly applied release. Removing the app from GROUT also removes the record. Installer exit alone is insufficient: a matching installed location/files must be found or selected.
+The release GROUT successfully applied is the primary version record, even when the publisher manifest reports an older version. Native metadata is stored as supporting evidence. If an external app change supplies a genuinely different native version from an owned app file, the record can note that detected version while retaining the last release GROUT applied. The record is retained when metadata is readable; removing the item from GROUT removes its record. Installer exit alone is insufficient: a matching installed location/files must be found or selected.
 
 
 
@@ -171,3 +171,19 @@ A selected folder installs its contents directly into the app folder; its enclos
 The choice is saved for future updates. Change it under **App settings → ZIP contents**. **Use entire ZIP** resets it. If a future archive no longer contains the saved item, GROUT stops before changing installed files and asks you to select it again. File overwrites remain automatic; this is not a conflict-review step.
 
 ![ZIP folder selection using sample data](images/zip-selection.png)
+
+## User-managed library tree
+
+Use **Add → New group** to create an organizer such as D2R. A tracked item can also have children: Reimagined remains updatable while Auto Deposit and Remote Stash sit below it. Existing items remain where they were until you organize them; GROUT does not infer parent relationships from source names.
+
+Right-click a row and choose **Name, parent and child folder…** to change its name, parent or optional **Default install folder for new children**. Names never construct physical paths. Reparenting and renaming do not move files. Removing a group or stopping tracking a parent promotes its children one level, leaving installed files alone. A physical parent uninstall is blocked if it would also remove other tracked installations.
+
+Use the row menu to add an app or mod under the selected parent. The Add screens show **Add to: D2R › Reimagined** separately from the physical **Install folder**. A parent default pre-fills new installations only; tracking an existing app still requires its actual location. New mod ZIPs use the exact selected folder; ordinary application ZIP installs still create an app-named child folder.
+
+Search and **Updates only** keep the tree context visible, including the parents of items that need updates. D2RLoader catalog browsing is temporarily hidden; direct mod URLs and existing tracked mods remain supported. The same source can appear in distinct physical destinations, with independent versions and extraction mappings. **Item type** distinguishes app/portable behavior from direct mod-folder extraction; grouping does not change that behavior.
+
+When a saved download cannot be matched to a new release, select **Choose download…**. GROUT explains which saved file is missing and remembers the compatible replacement. Then select **Update** to install. Added terminal revision markers such as `.R17` are recognized within the same filename family; multiple matches or changed editions still require a choice.
+
+Drag library rows to arrange them. Dragging onto an ordinary item’s label reorders before or after it; the line shows which. The explicit **Inside** area at the right makes it a child. Groups and items that already contain children also accept children in their middle. The top/bottom edge of any row always places the item before/after it. A line or outline and short label show the intended move. Dropping in empty list space moves to the end of the top level. Hold over a closed parent to expand it, or drag near the top/bottom edge to scroll. Escape cancels. Moving a parent carries its children. The chosen sibling order survives restart and is no longer reset alphabetically; install folders, versions and extraction mappings stay unchanged.
+
+Collapsed parents summarize every tracked installation in their branch, including an updatable parent itself: **All up to date**, **1 update**, or **N updates**. Failed checks/missing installations appear as issues rather than an incorrect all-current message. The selected item’s detail panel still describes that item’s own update status.

@@ -67,9 +67,9 @@ public static class FeatureTests
         var partial = new TrackedApp { Installed = "v2", Latest = "v2", Release = new("v2", "", "", [new("app.exe", "", 3, null)]), PartialUpdate = true, AssetName = "app.exe" };
         Check(partial.Status == "Partial update — review files" && partial.CanUpdate, "Matching version source cannot hide partial application and retry remains available");
         var missingAsset = new TrackedApp { Installed = "1.0", Latest = "2.0", Release = new("2.0", "", "", []), AssetName = "old.exe" };
-        Check(missingAsset.DisplayStatus == "No app downloads found", "Empty asset release explains unavailable update");
+        Check(missingAsset.DisplayStatus == "No compatible download", "Empty asset release explains unavailable update");
         missingAsset.Release.Assets.Add(new("new-name.exe", "", 3, null));
-        Check(missingAsset.DisplayStatus == "Choose release download", "Unmatched configured download has actionable status");
+        Check(missingAsset.DisplayStatus == "Choose download", "Unmatched configured download has actionable status");
         var settings = new Preferences();
         Check(settings.CheckHours == 24 && settings.IsDue(now), "New preferences default daily and due");
         settings.LastAttempt = now;

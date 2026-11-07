@@ -61,7 +61,6 @@ These render sample data rather than the user's library:
 
 ```text
 GROUT.exe --preview PNG_PATH
-GROUT.exe --preview-d2rloader PNG_PATH
 GROUT.exe --preview-zip-selection PNG_PATH
 GROUT.exe --preview-nexus PNG_PATH
 GROUT.exe --preview-missing PNG_PATH

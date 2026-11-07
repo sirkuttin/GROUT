@@ -48,13 +48,13 @@ public static class VersionRecordTests
             }
             Check(app.VersionRecord == before && app.Installed == "2.3.6", "Failed extraction preserves previous applied release record");
             File.WriteAllText(manifest, """{"name":"remote-stash-v2.3.7"}"""); InstalledVersions.Reconcile(app); store.Save([app]);
-            Check(app.VersionRecord == null && app.Installed == "2.3.7" && !File.Exists(recordPath), "Changed native manifest resumes detection and deletes fallback JSON");
+            Check(app.VersionRecord?.Evidence == "Applied" && app.Installed == "2.3.6" && app.VersionRecord.NativeVersion == "2.3.7" && File.Exists(recordPath), "An old manifest outside the applied payload updates supporting evidence without overriding the known applied release");
             var exe = Path.Combine(root, "portable.exe"); File.WriteAllBytes(exe, PortableExeFixture.Bytes());
             var portable = new TrackedApp { Repo = "test/portable", Latest = "v8.0", UpdateMethod = "ReplaceExe", UpdateTarget = exe };
             InstalledVersions.RecordAppliedExe(portable); store.Save([portable]);
             Check(portable.IsCurrent && portable.VersionRecord != null && portable.AutoReconcile, "Metadata-free portable EXE gets persistent fallback tracking");
             File.Copy(System.Reflection.Assembly.GetExecutingAssembly().Location, exe, true); InstalledVersions.Reconcile(portable); store.Save([portable]);
-            Check(portable.VersionRecord == null && InstalledVersions.Matches(portable.Installed, SelfUpdater.CurrentLabel) && !Directory.GetFiles(Path.Combine(root, "data", "versions")).Any(), "Real EXE version replaces fallback and cleans all retired records");
+            Check(portable.VersionRecord?.Evidence == "Detected" && InstalledVersions.Matches(portable.Installed, SelfUpdater.CurrentLabel) && Directory.GetFiles(Path.Combine(root, "data", "versions")).Length == 1, "Real EXE version updates the persistent record and retains the prior applied-release evidence");
             File.WriteAllBytes(exe, PortableExeFixture.Bytes()); InstalledVersions.RecordAppliedExe(portable); File.Delete(exe); InstalledVersions.Reconcile(portable);
             Check(portable.InstallationMissing && portable.LocalError, "A fallback record cannot hide removed app files");
             IReadOnlyList<InstalledRegistration> registered = [];
@@ -71,8 +71,27 @@ public static class VersionRecordTests
             var loaded = store.Load().Single(); Check(loaded.VersionRecord?.Method == "Installer", "Installer record survives restart");
             store.Save([]); Check(!File.Exists(installerRecordPath), "Stopping tracking/uninstalling removes orphan version record");
             var noInstall = new TrackedApp { Repo = "test/tool", Latest = "v4.0", InstallLocation = folder };
-            InstalledVersions.RecordInstallerWithoutVersion(noInstall);
+            InstalledVersions.RecordAppliedInstaller(noInstall);
             Check(noInstall.VersionRecord == null, "Tracking an existing app alone never fabricates an installation record");
+            var nativeTarget = Path.Combine(root, "Reimagined"); Directory.CreateDirectory(nativeTarget);
+            var info = Path.Combine(nativeTarget, "modinfo.json"); File.WriteAllText(info, """{"name":"Reimagined","version":"3.1.0"}""");
+            var nativeZip = Path.Combine(root, "stale-native.zip");
+            using (var archive = ZipFile.Open(nativeZip, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(archive.CreateEntry("modinfo.json").Open())) writer.Write("""{"name":"Reimagined","version":"3.1.0"}""");
+                using (var writer = new StreamWriter(archive.CreateEntry("data.txt").Open())) writer.Write("3.1.1 release payload");
+            }
+            var nativePayload = File.ReadAllBytes(nativeZip); using var nativeClient = new ReleaseClient(new Handler(nativePayload));
+            var nativeApp = new TrackedApp { Repo = "test/reimagined", UpdateMethod = "Zip", UpdateTarget = nativeTarget, InstallLocation = info, VersionSourceOverride = "modinfo.json", Installed = "3.1.0", Latest = "3.1.1", AutoReconcile = true };
+            await UpdateRunner.Run(owner, nativeApp, new("mod.zip", "https://github.com/test/reimagined/mod.zip", nativePayload.Length, null), nativeClient, (_, _) => { }, () => { }, newWork: Work);
+            Check(nativeApp.IsCurrent && nativeApp.VersionRecord?.AppliedVersion == "3.1.1" && nativeApp.VersionRecord.NativeVersion == "3.1.0" && nativeApp.UpdateState.Length == 0, "Reimagined-style stale version inside the new ZIP cannot override the release actually applied");
+            store.Save([nativeApp]); nativeApp = store.Load().Single(); InstalledVersions.Reconcile(nativeApp);
+            Check(nativeApp.IsCurrent && nativeApp.VersionRecord != null && File.ReadAllText(info).Contains("3.1.0"), "Applied-release truth survives restart without editing publisher metadata");
+            File.WriteAllText(info, """{"name":"Reformatted publisher manifest","version":"3.1.0"}"""); InstalledVersions.Reconcile(nativeApp);
+            Check(nativeApp.Installed == "3.1.1" && nativeApp.VersionRecord?.Evidence == "Applied", "Reformatting stale metadata does not downgrade the applied release");
+            File.WriteAllText(info, """{"version":"3.1.1"}"""); nativeApp.Latest = "3.1.1";
+            InstalledVersions.RecordAppliedZip(nativeApp, [new UpdateFile { Target = info, Relative = "modinfo.json", Source = info }]); store.Save([nativeApp]);
+            Check(nativeApp.VersionRecord?.Version == "3.1.1" && nativeApp.VersionRecord.NativeVersion == "3.1.1" && File.Exists(InstalledReleaseRecords.FilePath(Path.Combine(root, "data"), nativeApp.VersionRecordId)), "Even readable matching metadata receives a permanent installation record");
         }
         finally { owner.Close(); Directory.Delete(root, true); }
     }

@@ -85,7 +85,7 @@ public static class InstallDiscoveryTests
                 _ = wizard.Dispatcher.InvokeAsync(() => Find<Button>(wizard).Single(b => Equals(b.Content, "Download and run installer")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 var timeout = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) }; timeout.Tick += (_, _) => { timeout.Stop(); wizard.Close(); }; timeout.Start();
                 try { Check(wizard.ShowDialog() == true, "Installer → registry discovery → setup closes without final directory screen"); } finally { timeout.Stop(); }
-                Check(wizard.Result.AppFolder == folder && wizard.Result.Installed == "3.4.1" && wizard.Result.InstallationLocated, "Auto-completed wizard returns discovered installation for library addition");
+                Check(wizard.Result.AppFolder == folder && InstalledVersions.Matches(wizard.Result.Installed, "3.4.1") && wizard.Result.InstallationLocated, "Auto-completed wizard returns discovered installation for library addition");
                 var store = new Store(Path.Combine(root, "library.json")); store.Save([wizard.Result]);
                 Check(store.Load().Single().InstallLocation == exe, "Automatically located installation survives library persistence");
                 Check(!File.ReadAllText(Path.Combine(root, "library.json")).Contains("HKCU/64/Gram"), "Transient registry scan data is not saved into library");

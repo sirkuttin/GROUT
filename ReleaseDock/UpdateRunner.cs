@@ -84,14 +84,14 @@ public static class UpdateRunner
                 if (match != null && (newInstall || app.InstallLocation.Length == 0 || string.Equals(AppLocationDraft.From(app).Folder.TrimEnd('\\'), match.Folder, StringComparison.OrdinalIgnoreCase)))
                 {
                     InstallDiscovery.Apply(app, match);
-                    if (match.Changed && string.IsNullOrWhiteSpace(match.Entry.Version)) InstalledVersions.RecordInstallerWithoutVersion(app, match.Entry.Id);
+                    if (match.Changed || app.IsCurrent) InstalledVersions.RecordAppliedInstaller(app, match.Entry.Id);
                     if (InstallDiscovery.CanFinish(app)) break;
                     app.InstallDiscoveryNote = $"Found {match.Entry.Name}, but it still reports {app.Installed}. The expected release is {app.Latest}. Confirm the installation or try finding it again.";
                 }
                 else app.InstallDiscoveryNote = app.InstallCandidates.Count > 0 ? "Possible installations found. Choose the correct entry or keep the configured location." : "No matching install location found yet. The installer may still be finishing; try Find installation again.";
                 if (attempt < 3) await Task.Delay(750);
             }
-            if (!newInstall && app.InstallLocation.Length > 0 && app.InstallCandidates.Count == 0) InstalledVersions.RecordInstallerWithoutVersion(app);
+            if (!newInstall && app.InstallLocation.Length > 0 && app.InstallCandidates.Count == 0) InstalledVersions.RecordAppliedInstaller(app);
         }
         else if (app.UpdateMethod == "ReplaceExe")
         {

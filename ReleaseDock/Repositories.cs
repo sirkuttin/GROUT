@@ -26,7 +26,7 @@ public static class Repositories
             if (host == "d2rloader.net")
             {
                 var mod = Regex.Match(path, @"^(?:api/v1/)?hub/plugins/([a-z0-9][a-z0-9_-]*)$", RegexOptions.IgnoreCase);
-                if (!mod.Success) throw new ArgumentException("Paste an individual D2RLoader mod page, or choose Browse D2RLoader to select one.");
+                if (!mod.Success) throw new ArgumentException("Paste an individual D2RLoader mod-page URL, such as https://d2rloader.net/hub/plugins/example.");
                 return new(host, "hub/plugins/" + mod.Groups[1].Value.ToLowerInvariant());
             }
             if (host == "nexusmods.com")

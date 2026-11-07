@@ -119,16 +119,21 @@ public static class InstalledVersions
                     var actual = Read(app.InstallLocation, UsesD2RLoaderManifest(app));
                     if (InstalledReleaseRecords.NewSource(record, actual))
                     {
-                        app.VersionRecord = null; app.Installed = actual.Version;
-                        app.InstalledProvenance = "Version read from " + actual.Source;
-                        app.LocalStatus = $"Detected {actual.Version} from {actual.Source}"; app.LocalError = false; return;
+                        var ownedSource = record.Files.Any(f => string.Equals(Path.GetFullPath(f), Path.GetFullPath(actual.Source), StringComparison.OrdinalIgnoreCase));
+                        var unchangedMetadata = !ownedSource || record.NativeVersion.Length > 0 && Matches(actual.Version, record.NativeVersion);
+                        app.VersionRecord = record with { Version = unchangedMetadata ? record.Version : actual.Version, NativeVersion = actual.Version, IgnoredSource = actual.Source, IgnoredHash = InstalledReleaseRecords.Fingerprint(actual.Source), AppliedVersion = record.AppliedVersion.Length > 0 ? record.AppliedVersion : record.Version, Evidence = unchangedMetadata ? record.Evidence : "Detected" };
+                        app.Installed = app.VersionRecord.Version;
+                        app.InstalledProvenance = unchangedMetadata ? "Installed release recorded by GROUT: " + record.Version : "Version detected from changed app files: " + actual.Version;
+                        app.LocalStatus = app.InstalledProvenance; app.LocalError = false; return;
                     }
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
                 if (record.RegistrationId.Length > 0 && InstallDiscovery.ReadRegistry().FirstOrDefault(r => r.Id == record.RegistrationId) is { } registration && !string.IsNullOrWhiteSpace(registration.Version))
                 {
-                    app.VersionRecord = null; app.AutoReconcile = false; app.Installed = registration.Version; app.LocalError = false;
-                    app.InstalledProvenance = "Windows installed-app entry " + registration.Name + " reports " + registration.Version; app.LocalStatus = app.InstalledProvenance; return;
+                    if (record.NativeVersion.Length == 0) app.VersionRecord = record with { NativeVersion = registration.Version };
+                    else if (!Matches(registration.Version, record.NativeVersion)) app.VersionRecord = record with { Version = registration.Version, NativeVersion = registration.Version, Evidence = "Detected" };
+                    app.Installed = app.VersionRecord!.Version; app.LocalError = false;
+                    app.LocalStatus = "Installed release recorded by GROUT: " + app.Installed; return;
                 }
                 var missing = record.Files.Where(f => !File.Exists(f)).ToList();
                 if (missing.Count > 0)
@@ -156,20 +161,8 @@ public static class InstalledVersions
     public static void RecordAppliedExe(TrackedApp app)
     {
         app.InstallLocation = app.UpdateTarget;
-        app.Installed = app.Latest;
         app.PartialUpdate = false;
-        app.InstalledProvenance = $"Saved from {Repositories.Resolve(app.Repo.Length > 0 ? app.Repo : "local/app").Name} release {app.Latest}. Future updates track the release saved by GROUT.";
-        app.AutoReconcile = false;
-        app.LocalError = false;
-        try
-        {
-            var detected = Read(app.UpdateTarget);
-            if (Matches(detected.Version, app.Latest)) { app.AutoReconcile = true; app.Installed = detected.Version; }
-            else app.InstalledProvenance += $" The EXE reports {detected.Version}; automatic metadata comparison is paused.";
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
-        if (!app.AutoReconcile) InstalledReleaseRecords.Record(app, [app.UpdateTarget]);
-        else app.VersionRecord = null;
+        InstalledReleaseRecords.Record(app, [app.UpdateTarget]);
         Reconcile(app);
         app.UpdateState = "";
     }
@@ -183,18 +176,16 @@ public static class InstalledVersions
             {
                 var found = Read(candidates[0].Target, UsesD2RLoaderManifest(app));
                 app.AppFolder = app.UpdateTarget; app.AppFile = ""; app.VersionSourceOverride = candidates[0].Relative; app.InstallLocation = found.Source;
-                app.AutoReconcile = true; app.VersionRecord = null; Reconcile(app); return;
+                InstalledReleaseRecords.Record(app, plan.Select(f => f.Target)); Reconcile(app); return;
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
         }
         app.AppFolder = app.UpdateTarget; app.AppFile = ""; app.VersionSourceOverride = ""; app.InstallLocation = app.UpdateTarget;
         InstalledReleaseRecords.Record(app, plan.Select(f => f.Target)); Reconcile(app);
     }
-    public static void RecordInstallerWithoutVersion(TrackedApp app, string registrationId = "")
+    public static void RecordAppliedInstaller(TrackedApp app, string registrationId = "")
     {
         if (app.PendingInstallerRelease != app.Latest || app.Latest.Length == 0 || app.InstallLocation.Length == 0) return;
-        try { _ = Read(app.InstallLocation, UsesD2RLoaderManifest(app)); app.VersionRecord = null; return; }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception) { }
         var folder = AppLocationDraft.From(app).Folder;
         var files = File.Exists(app.InstallLocation) ? new[] { app.InstallLocation } : Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Take(10001).ToArray() : [];
         if (files.Length is > 0 and <= 10000) { InstalledReleaseRecords.Record(app, files, registrationId); Reconcile(app); }

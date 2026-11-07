@@ -12,7 +12,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*Current 0.8.0 test interface with sample data.*
+*GROUT 0.10.0 interface with sample data.*
 
 > **Nexus Mods:** integration is under development and disabled in public builds pending application registration. See the [Nexus guide](docs/nexus-mods.md).
 
@@ -22,7 +22,8 @@ GROUT also supports [website download tracking](docs/supported-sources.md#websit
 
 - **Watches releases** on GitHub, Codeberg and GitLab, plus D2RLoader, with optional preview releases.
 - **Updates your way:** run an installer, replace a portable EXE, extract a ZIP, or download for manual installation.
-- **Tracks installed versions** from EXE metadata or manifests, with manual tracking when needed.
+- **Records installed releases** after successful updates, with EXE/manifest metadata as supporting evidence.
+- **Organizes your library** with user-managed groups, parent/child items, drag-and-drop ordering and collapsed update summaries.
 - **Stays out of the way:** scheduled checks, tray notifications, quiet mode and optional start at sign-in.
 - **Finds missing installations:** locate a moved app or stop tracking one you removed.
 - **Updates itself** from this repository's stable releases after you choose **Update GROUT**.

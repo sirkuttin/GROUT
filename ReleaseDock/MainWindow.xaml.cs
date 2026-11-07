@@ -22,6 +22,8 @@ public partial class MainWindow : Window
     private Forms.NotifyIcon? tray;
     private System.Drawing.Icon? trayIcon;
     private bool busy, exiting;
+    private bool uiReady, filtering;
+    private string section = "Library";
     private CancellationTokenSource? operation;
     private readonly bool preview;
     private TrackedApp? Current => Library.SelectedItem as TrackedApp;
@@ -31,14 +33,17 @@ public partial class MainWindow : Window
         dataDirectory ??= AppPaths.Data;
         store = new Store(Path.Combine(dataDirectory, "apps.json"));
         preferencesPath = Path.Combine(dataDirectory, "settings.json");
-        InitializeComponent(); Library.ItemsSource = apps;
+        InitializeComponent(); Library.ItemsSource = apps; uiReady = true;
+        var treeView = (System.Windows.Data.ListCollectionView)System.Windows.Data.CollectionViewSource.GetDefaultView(apps);
+        treeView.Filter = value => value is TrackedApp node && node.TreeVisible;
+        treeView.CustomSort = new TreeOrderComparer();
         Ui.ConstrainToScreen(this);
         if (preview)
         {
             apps.Add(new() { Repo = "example/desktop-app", Installed = "v1.0.0", Latest = "v1.1.0", AssetName = "DesktopApp-x64.exe", UpdateMethod = "Installer", Release = new("v1.1.0", "", "A faster launch and several useful improvements.", [new("DesktopApp-x64.exe", "", 0, null)]) });
             Library.SelectedIndex = 0; Render(); StatusLabel.Text = "Preview data • Your library is untouched"; return;
         }
-        try { preferences = Preferences.Load(preferencesPath); foreach (var app in store.Load()) { Repositories.Parse(app.Repo); apps.Add(app); } }
+        try { preferences = Preferences.Load(preferencesPath); foreach (var app in store.Load()) { if (!app.IsGroup) Repositories.Parse(app.Repo); apps.Add(app); } }
         catch (Exception ex) { MessageBox.Show("Could not load data. Existing files have been left intact.\n" + ex.Message, "GROUT"); IsEnabled = false; Closed += (_, _) => Application.Current.Shutdown(); return; }
         if (preferences.RetryAfter is { } legacyPause && legacyPause > DateTimeOffset.UtcNow) preferences.SourceBackoffs["github.com"] = legacyPause;
         preferences.RetryAfter = null; github.RestoreBackoffs(preferences.SourceBackoffs);
@@ -66,7 +71,7 @@ public partial class MainWindow : Window
         };
         Closed += (_, _) => { timer.Stop(); if (tray != null) { tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Dispose(); tray = null; } trayIcon?.Dispose(); trayIcon = null; github.Dispose(); selfUpdater.Dispose(); };
         Activated += (_, _) => { if (!busy && OwnedWindows.Count == 0) ReconcileAll(); };
-        timer.Tick += async (_, _) => { if (busy || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); await CheckSelf(false); };
+        timer.Tick += async (_, _) => { if (busy || treeDragging || OwnedWindows.Count > 0) return; ReconcileAll(); if (preferences.IsDue(DateTimeOffset.UtcNow) && apps.Count > 0) await CheckAll(false); await CheckSelf(false); };
         timer.Start();
         Loaded += async (_, _) =>
         {
@@ -78,6 +83,68 @@ public partial class MainWindow : Window
         };
         Application.Current.SessionEnding += (_, _) => { exiting = true; };
         Render();
+    }
+    private sealed class TreeOrderComparer : System.Collections.IComparer { public int Compare(object? x, object? y) => ((TrackedApp)x!).TreeOrder.CompareTo(((TrackedApp)y!).TreeOrder); }
+    internal void PreviewModLibrary()
+    {
+        if (!preview) return;
+        var d2r = new TrackedApp { IsGroup = true, CustomName = "D2R" }; apps.Add(d2r);
+        var reimagined = new TrackedApp { ParentId = d2r.Id, Repo = "D2R-Reimagined/d2r-reimagined-mod", CustomName = "Reimagined", ItemKind = "Mod", Installed = "3.1.1", Latest = "3.1.1", UpdateMethod = "Zip", UpdateTarget = @"D:\Games\D2R\mods\Reimagined.mpq", AppFolder = @"D:\Games\D2R\mods\Reimagined.mpq", DefaultChildFolder = @"D:\Games\D2R\d2rloader" }; apps.Add(reimagined);
+        foreach (var name in new[] { "Auto Deposit", "Remote Stash" }) apps.Add(new() { ParentId = reimagined.Id, Repo = "https://d2rloader.net/hub/plugins/" + (name == "Auto Deposit" ? "reimagined-only-auto-deposit" : "remote-stash"), CustomName = name, UpdateMethod = "Zip", UpdateTarget = @"D:\Games\D2R\d2rloader\" + (name == "Auto Deposit" ? "auto-deposit" : "remote-stash"), AppFolder = @"D:\Games\D2R\d2rloader\" + (name == "Auto Deposit" ? "auto-deposit" : "remote-stash"), Installed = "1.0", Latest = name == "Remote Stash" ? "2.0" : "1.0", AssetName = "Mod.zip", Release = new(name == "Remote Stash" ? "2.0" : "1.0", "", "", [new("Mod.zip", "", 0, null)]) });
+        Render(); Library.SelectedItem = reimagined; Render();
+    }
+    internal void PreviewCollapsedGroups()
+    {
+        PreviewModLibrary(); var steam = new TrackedApp { IsGroup = true, CustomName = "Steam Frame", Expanded = false }; apps.Add(steam);
+        apps.Add(new() { ParentId = steam.Id, Repo = "example/framedrop", CustomName = "FrameDrop", Installed = "1.0", Latest = "1.0" });
+        foreach (var node in apps) if (node.IsGroup) node.Expanded = false;
+        Render(); Library.SelectedItem = apps.First(n => n.AppName == "D2R"); Render();
+    }
+    private void RefreshLibrary()
+    {
+        filtering = true;
+        try
+        {
+            LibraryTree.Prepare(apps, section == "Updates", LibrarySearch.Text.Trim());
+            System.Windows.Data.CollectionViewSource.GetDefaultView(apps).Refresh();
+            if (Library.SelectedItem == null && Library.Items.Count > 0) Library.SelectedIndex = 0;
+        }
+        finally { filtering = false; }
+    }
+    private void UpdatesOnly_Click(object sender, RoutedEventArgs e) { if (!uiReady) return; section = UpdatesOnlyFilter.IsChecked == true ? "Updates" : "Library"; Render(); }
+    private void Filter_Changed(object sender, SelectionChangedEventArgs e) { if (uiReady && !filtering) Render(); }
+    private void Search_Changed(object sender, TextChangedEventArgs e) { if (uiReady && !filtering) Render(); }
+    private void ShowAddMenu(TrackedApp? parent)
+    {
+        var menu = new ContextMenu();
+        void Add(string label, Action action) { var item = new MenuItem { Header = label }; item.Click += (_, _) => action(); menu.Items.Add(item); }
+        Add("Add app…", () => OpenSetup(null, false, parent)); Add("Add mod…", () => OpenSetup(null, true, parent));
+        Add("New group…", () => { var group = new TrackedApp { IsGroup = true, CustomName = "New group", ParentId = parent?.Id ?? "" }; if (LibraryTree.Edit(this, group, apps)) { apps.Add(group); if (parent != null) parent.Expanded = true; SafePersist(); Render(); Library.SelectedItem = group; } });
+        menu.PlacementTarget = AddAppButton; menu.IsOpen = true;
+    }
+    private void AddChild_Click(object sender, RoutedEventArgs e) { if (!busy && !preview) ShowAddMenu(Current); }
+    private void Organize_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || preview || Current is not { } node) return;
+        if (LibraryTree.Edit(this, node, apps)) { SafePersist(); Render(); }
+    }
+    private void ExpandNode_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: TrackedApp node }) { node.Expanded = !node.Expanded; SafePersist(); Render(); e.Handled = true; }
+    }
+    private void TreeRightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(Library, source) is ListBoxItem item) item.IsSelected = true;
+    }
+    private void TreeMenu_Opening(object sender, ContextMenuEventArgs e)
+    {
+        if (busy || preview || Current is not { } node) { e.Handled = true; return; }
+        var menu = Library.ContextMenu; menu.Items.Clear();
+        void Add(string label, Action action) { var item = new MenuItem { Header = label }; item.Click += (_, _) => action(); menu.Items.Add(item); }
+        Add("Add app here…", () => OpenSetup(null, false, node)); Add("Add mod here…", () => OpenSetup(null, true, node));
+        Add("New group here…", () => { var group = new TrackedApp { IsGroup = true, CustomName = "New group", ParentId = node.Id }; if (LibraryTree.Edit(this, group, apps)) { apps.Add(group); node.Expanded = true; SafePersist(); Render(); } });
+        Add("Name, parent and child folder…", () => Organize_Click(this, new()));
+        Add(node.IsGroup ? "Remove group" : "Stop tracking", () => Remove_Click(this, new()));
     }
     private void ShowMain() { Show(); WindowState = WindowState.Normal; Activate(); }
     private async Task CheckSelf(bool manual)
@@ -140,18 +207,29 @@ public partial class MainWindow : Window
     private void SafePersist() { try { Persist(); } catch (Exception ex) { StatusLabel.Text = "Could not save: " + ex.Message; } }
     private void Render()
     {
+        if (!uiReady || filtering) return;
+        RefreshLibrary();
         var app = Current;
+        TargetContextLabel.Text = app?.IsMod == true ? (app.TargetLabel.Length > 0 ? "Group: " + app.TargetLabel + "\n" : "") + "Install folder: " + AppLocationDraft.From(app).Folder : "";
+        TargetContextLabel.Visibility = app?.IsMod == true ? Visibility.Visible : Visibility.Collapsed;
+        UninstallButton.Content = app?.IsMod == true ? "Remove mod files…" : "Uninstall…";
+        AppSettingsButton.Content = "Settings"; AppFolderButton.Content = app?.IsMod == true ? "Open mod folder" : "Open app folder";
+        AddAppButton.Content = "+ Add…";
         CheckSelfButton.IsEnabled = InstallSelfButton.IsEnabled = !busy && !selfChecking;
         CheckSelfButton.Visibility = selfRelease == null ? Visibility.Visible : Visibility.Collapsed;
         InstallSelfButton.Visibility = selfRelease != null ? Visibility.Visible : Visibility.Collapsed;
         if (SelfUpdateLabel.Text.Length == 0) SelfUpdateLabel.Text = "GROUT " + SelfUpdater.CurrentLabel;
-        CountLabel.Text = checkingApps ? "Checking for updates…" : $"{apps.Count} app(s) · {apps.Count(a => a.CanUpdate && ReleaseFiles.Match(a) != null)} update(s) ready";
+        var visibleScope = apps.Where(a => !a.IsGroup).ToList();
+        CountLabel.Text = checkingApps ? "Checking for updates…" : $"{visibleScope.Count} tracked item(s) · {visibleScope.Count(a => a.CanUpdate && ReleaseFiles.Match(a) != null)} update(s) ready";
+        CheckButton.Content = "Check now"; UpdatesOnlyFilter.Content = "Updates only (" + visibleScope.Count(a => a.CanUpdate) + ")";
         AddAppButton.IsEnabled = AppSettingsButton.IsEnabled = SettingsButton.IsEnabled = CheckButton.IsEnabled = !busy;
         VersionSection.IsEnabled = UninstallButton.IsEnabled = RecoveryButton.IsEnabled = RemoveButton.IsEnabled = !busy;
-        Details.Visibility = app == null ? Visibility.Collapsed : Visibility.Visible;
-        AppTitle.Text = app?.AppName ?? "Bring your apps aboard.";
+        Details.Visibility = app == null || app.IsGroup ? Visibility.Collapsed : Visibility.Visible;
+        GroupDetails.Visibility = app?.IsGroup == true ? Visibility.Visible : Visibility.Collapsed;
+        GroupDescription.Text = app?.IsGroup == true ? "This group organizes its children. It does not install or move files.\n\nDefault folder for new children: " + (app.DefaultChildFolder.Length > 0 ? app.DefaultChildFolder : "Not set") : "";
+        AppTitle.Text = app?.AppName ?? (section == "Updates" ? "No matching updates." : "No matching items.");
         SourceLabel.Text = app?.RepositoryUrl ?? "";
-        VersionLabel.Text = app?.Versions ?? "Choose Add App to track an existing installation or install something new from a supported release host.";
+        VersionLabel.Text = app?.IsGroup == true ? "" : app?.Versions ?? "Choose Add App to track an existing installation or install something new from a supported release host.";
         StateLabel.Text = app?.DisplayStatus ?? "";
         var missing = app?.InstallationMissing == true && !app.UninstallPending;
         MissingBanner.Visibility = missing ? Visibility.Visible : Visibility.Collapsed;
@@ -164,11 +242,11 @@ public partial class MainWindow : Window
         InstalledInput.Text = app?.Installed ?? "";
         LocalLabel.Text = app?.LocalStatus ?? "";
         var asset = app != null ? ReleaseFiles.Match(app) : null;
-        UpdateButton.IsEnabled = !busy && app?.CanUpdate == true && asset != null && (asset.OriginHost != "nexusmods.com" || NexusMods.Enabled);
-        UpdateButton.Content = asset?.OriginHost == "nexusmods.com" && (preview || !github.Nexus.CanDownload) ? "Open Nexus download" : "Update";
-        UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose a release download in App settings." : "Apply the configured update method.";
-        MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod) + (asset == null ? " · Choose a release file in App settings" : app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
-        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.Release?.SourceWarning ?? "", app.UpdateIssue }.Where(s => s.Length > 0));
+        UpdateButton.IsEnabled = !busy && app?.CanUpdate == true && (asset != null || ReleaseFiles.UpdateCandidates(app).Count > 0) && (asset?.OriginHost != "nexusmods.com" || NexusMods.Enabled);
+        UpdateButton.Content = app?.CanUpdate == true && asset == null && ReleaseFiles.UpdateCandidates(app).Count > 0 ? "Choose download…" : asset?.OriginHost == "nexusmods.com" && (preview || !github.Nexus.CanDownload) ? "Open Nexus download" : "Update";
+        UpdateButton.ToolTip = busy ? "Wait for the current operation to finish." : app?.Error.Length > 0 ? "The release check failed. Check now or review App settings." : app is { AutoReconcile: true, LocalError: true } ? "Installed version could not be verified. Recheck it or enter it manually." : app?.IsOlderRelease == true ? "The available version is older than the installed version. Automatic downgrades are disabled; review the release channel in App settings." : app?.Installed.Length == 0 ? "Set the installed version or configure detection first." : app?.IsCurrent == true ? "This app is up to date." : asset == null ? "Choose the download file to continue with this update." : "Apply the configured update method.";
+        MethodLabel.Text = app == null ? "" : ReleaseFiles.Label(app.UpdateMethod, app.IsMod) + (app.UpdateMethod is "Zip" or "ReplaceExe" ? " → " + app.UpdateTarget : "");
+        UpdateStateLabel.Text = app == null || missing ? "" : string.Join("\n", new[] { app.Error, app.Release?.SourceWarning ?? "", ReleaseFiles.SelectionExplanation(app), app.UpdateIssue }.Where(s => s.Length > 0));
         UpdateStateLabel.Visibility = UpdateStateLabel.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         DownloadedButton.Visibility = app?.UpdateMethod == "Manual" && File.Exists(app.DownloadedPath) ? Visibility.Visible : Visibility.Collapsed;
         AppFolderButton.Visibility = app != null && AppLocationDraft.From(app).Folder.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -181,9 +259,10 @@ public partial class MainWindow : Window
     }
     private void ReconcileAll()
     {
-        if (busy || preview || OwnedWindows.Count > 0) return;
+        if (busy || treeDragging || preview || OwnedWindows.Count > 0) return;
         foreach (var app in apps)
         {
+            if (app.IsGroup) continue;
             InstalledVersions.Reconcile(app);
             if (app.UpdateState.Length > 0 && app.UpdateIssue.Length == 0) app.UpdateState = "";
         }
@@ -205,20 +284,21 @@ public partial class MainWindow : Window
     }
     private async Task CheckAll(bool manual)
     {
-        if (busy || preview || OwnedWindows.Count > 0) return;
+        if (busy || treeDragging || preview || OwnedWindows.Count > 0) return;
         busy = true; checkingApps = true; preferences.LastAttempt = DateTimeOffset.UtcNow;
+        var checking = apps.Where(a => !a.IsGroup).ToList();
         try
         {
             Render();
             var alerts = new List<TrackedApp>();
-            foreach (var app in apps.ToList())
+            foreach (var app in checking)
             {
                 await Fetch(app);
                 if (ReleaseFiles.TakeNotification(app, preferences.Quiet)) alerts.Add(app);
                 Library.Items.Refresh(); Render();
                 await Task.Delay(400);
             }
-            if (apps.All(a => a.Error.Length == 0)) { preferences.LastSuccess = DateTimeOffset.UtcNow; preferences.RetryAfter = null; }
+            if (checking.All(a => a.Error.Length == 0)) { preferences.LastSuccess = DateTimeOffset.UtcNow; preferences.RetryAfter = null; }
             Persist();
             if (alerts.Count > 0) tray?.ShowBalloonTip(8000, $"{alerts.Count} app update(s) available", string.Join("\n", alerts.Take(4).Select(a => a.Repo + " · " + a.Latest)), Forms.ToolTipIcon.Info);
 
@@ -229,15 +309,20 @@ public partial class MainWindow : Window
     private void Add_Click(object sender, RoutedEventArgs e)
     {
         if (busy || preview) return;
-        var wizard = new SetupWindow(github, apps.Select(a => a.Repo)) { Owner = this };
+        ShowAddMenu(null);
+    }
+    private void OpenSetup(string? link, bool mod, TrackedApp? parent = null)
+    {
+        var wizard = new SetupWindow(github, apps.Where(a => !a.IsGroup).Select(a => a.Repo), trackedApps: apps, initialLink: link, mod: mod, parentId: parent?.Id ?? "", childDefaultFolder: parent?.DefaultChildFolder ?? "") { Owner = this };
         if (wizard.ShowDialog() != true) return;
         if (wizard.ExistingRepo.Length > 0) { Library.SelectedItem = apps.First(a => a.Repo.Equals(wizard.ExistingRepo, StringComparison.OrdinalIgnoreCase)); return; }
+        section = "Library"; UpdatesOnlyFilter.IsChecked = false; LibrarySearch.Text = ""; if (parent != null) parent.Expanded = true;
         wizard.Result.InstallationBefore = []; apps.Add(wizard.Result); SafePersist(); Library.SelectedItem = wizard.Result; Render(); StatusLabel.Text = wizard.Result.InstallDiscoveryNote;
     }
     private async void AppSettings_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || Current is not { } app || preview) return;
-        var wizard = new SetupWindow(github, apps.Where(a => a != app).Select(a => a.Repo), app) { Owner = this };
+        if (busy || Current is not { IsGroup: false } app || preview) return;
+        var wizard = new SetupWindow(github, apps.Where(a => a != app && !a.IsGroup).Select(a => a.Repo), app, trackedApps: apps.Where(a => a != app)) { Owner = this };
         if (wizard.ShowDialog() != true) return;
         var index = apps.IndexOf(app); apps[index] = wizard.Result; Library.SelectedItem = wizard.Result; busy = true;
         try { await Fetch(wizard.Result); SafePersist(); } finally { busy = false; Render(); }
@@ -292,16 +377,18 @@ public partial class MainWindow : Window
     private void Mark_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app || app.Latest.Length == 0) return;
-        app.Installed = app.Latest; app.PartialUpdate = false; app.AutoReconcile = false; app.VersionRecord = null; app.InstalledProvenance = "Manually marked installed"; app.LocalStatus = app.InstalledProvenance; app.UpdateState = ""; SafePersist(); Render();
+        app.Installed = app.Latest; app.PartialUpdate = false; app.AutoReconcile = false; if (app.VersionRecord is { } record) app.VersionRecord = record with { Version = app.Installed, Evidence = "Manual" }; app.InstalledProvenance = "Manually marked installed"; app.LocalStatus = app.InstalledProvenance; app.UpdateState = ""; SafePersist(); Render();
     }
     private void SaveVersion_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app) return;
-        app.Installed = InstalledInput.Text.Trim(); app.PartialUpdate = false; app.AutoReconcile = false; app.VersionRecord = null; app.InstalledProvenance = "Manual version tracking"; app.LocalStatus = app.InstalledProvenance; SafePersist(); Render();
+        app.Installed = InstalledInput.Text.Trim(); app.PartialUpdate = false; app.AutoReconcile = false; if (app.VersionRecord is { } record) app.VersionRecord = record with { Version = app.Installed, Evidence = "Manual" }; app.InstalledProvenance = "Manual version tracking"; app.LocalStatus = app.InstalledProvenance; SafePersist(); Render();
     }
     private async void Update_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || Current is not { CanUpdate: true } app || ReleaseFiles.Match(app) is not { } asset || preview) return;
+        if (busy || Current is not { CanUpdate: true } app || preview) return;
+        var asset = ReleaseFiles.Match(app);
+        if (asset == null) { if (ReleaseDownloadPicker.Show(this, app)) { SafePersist(); Render(); } return; }
         if (asset.OriginHost == "nexusmods.com" && !github.Nexus.CanDownload)
         {
             try { Process.Start(new ProcessStartInfo(NexusMods.FilePage(app.Repo, asset)) { UseShellExecute = true }); ActionErrorLabel.Text = ""; }
@@ -400,12 +487,14 @@ public partial class MainWindow : Window
     }
     private void Uninstall_Click(object sender, RoutedEventArgs e)
     {
-        if (Current is not { } app || busy || app.UninstallPending) return;
+        if (Current is not { IsGroup: false } app || busy || app.UninstallPending) return;
         try
         {
             var registered = app.UpdateMethod is "ReplaceExe" or "Zip" ? null : AppUninstall.Registered(app, InstallDiscovery.ReadRegistry());
             if (registered != null)
             {
+                var installedFolder = AppLocationDraft.From(app).Folder;
+                if (installedFolder.Length > 0 && LibraryTree.OverlapsOtherInstallation(app, installedFolder, apps)) throw new InvalidOperationException("This installation contains other tracked items. Resolve their saved destinations before uninstalling the parent.");
                 var command = AppUninstall.Command(registered.Uninstall);
                 if (MessageBox.Show(this, $"Uninstall {registered.Name}?\n\nWindows will open its uninstaller. Follow its prompts to finish. GROUT will remove this entry after removal is confirmed.\n\n{command.FileName}\n{command.Arguments}", "Uninstall app", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
                 var draft = AppLocationDraft.From(app);
@@ -431,6 +520,7 @@ public partial class MainWindow : Window
                 var draft = AppLocationDraft.From(app);
                 if (draft.Conflict) throw new InvalidOperationException("Resolve the app location conflict in App settings first.");
                 var target = AppUninstall.ZipFolder(app);
+                if (LibraryTree.OverlapsOtherInstallation(app, target, apps)) throw new InvalidOperationException("This folder contains other tracked installations. Uninstall them separately or correct their saved folders before removing this parent.");
                 if (MessageBox.Show(this, $"Remove {app.AppName} and its entire app folder?\n\n{target}\n\nClose the app first. ALL files and subfolders here, including settings and any files you added, will move to the Recycle Bin. Check that this folder belongs only to this app. Its GROUT entry will also be removed.", "Remove portable app folder", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
                 busy = true; AppUninstall.Begin(app, target); Persist(); Render();
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(target, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
@@ -451,8 +541,8 @@ public partial class MainWindow : Window
     private void Remove_Click(object sender, RoutedEventArgs e)
     {
         if (busy || Current is not { } app) return;
-        var prompt = AppUninstall.TrackingPrompt(app);
+        var prompt = app.IsGroup ? (Title: "Remove group", Message: "Remove " + app.AppName + "? Its children will move up one level. No installed files will change.") : AppUninstall.TrackingPrompt(app);
         if (MessageBox.Show(this, prompt.Message, prompt.Title, MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-        apps.Remove(app); SafePersist(); Render();
+        LibraryTree.RemoveKeepingChildren(apps, app); SafePersist(); Render();
     }
 }

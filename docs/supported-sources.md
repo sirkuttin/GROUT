@@ -63,4 +63,4 @@ A developer can still publish an unsuitable package. Choose the release file and
 
 ## D2RLoader
 
-Mod page and detail API URLs map to the same tracked item. **Browse D2RLoader…** in Add App reads the paginated catalog on demand. Checks use the chosen mod detail endpoint rather than scanning the catalog. Downloads use the release-ID endpoint with exact byte-size and SHA-256 verification. Loader requirements and source scan warnings are preserved. See the [D2RLoader guide](d2rloader.md).
+Mod page and detail API URLs map to the same tracked item. Catalog browsing is temporarily hidden; add an individual mod by its URL. Checks use the chosen mod detail endpoint rather than scanning the catalog. Downloads use the release-ID endpoint with exact byte-size and SHA-256 verification. Loader requirements and source scan warnings are preserved. See the [D2RLoader guide](d2rloader.md).

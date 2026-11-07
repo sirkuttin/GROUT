@@ -2,11 +2,11 @@
 
 [← Back to README](../README.md) · [ZIP contents selection](user-guide.md#install-part-of-a-zip)
 
-Available in local 0.8.0 builds. The provided public API works without an API key.
+Supported through direct mod links. The provided public API works without an API key.
 
 ## Add a mod
 
-Paste either form into **Add App**:
+Paste either form into **Add → Add mod**:
 
 ```text
 https://d2rloader.net/hub/plugins/more-merc-items
@@ -15,9 +15,7 @@ https://d2rloader.net/api/v1/hub/plugins/more-merc-items
 
 Both identify the same library entry. Choose to track an existing installation or install from a ZIP. The mod's name appears in the library; its source page is linked beneath it.
 
-Alternatively choose **Browse D2RLoader…**. The browser shows public mods and patches, newest first, with Search and Previous/Next controls. Search uses the API q parameter. Press Enter or Search; searches restart on page 1, and paging retains the query. Clear the field and search again to return to all items. It requests a page only when needed. Select a row and choose **Use this mod** to fill the Add App link.
-
-![Catalog using sample data](images/d2rloader.png)
+Catalog browsing is temporarily hidden. Paste an individual mod link to add it; existing tracked mods continue to update normally.
 
 ## Install and update
 

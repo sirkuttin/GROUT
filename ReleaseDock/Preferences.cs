@@ -66,17 +66,28 @@ public static class ReleaseFiles
         app.LastNotifiedTag = app.Latest;
         return !quiet;
     }
-    public static string Family(string name) => System.Text.RegularExpressions.Regex.Replace(name, @"\d+\.\d+(?:\.\d+)*", "{version}");
+    public static string Family(string name)
+    {
+        var family = System.Text.RegularExpressions.Regex.Replace(name, @"\d+\.\d+(?:\.\d+)*", "{version}");
+        return family.Contains("{version}") ? System.Text.RegularExpressions.Regex.Replace(family, @"(?<=\{version\})[._ -]+[rR]\d+(?=\.[^.]+$)", "") : family;
+    }
+    public static List<Asset> UpdateCandidates(TrackedApp app) => AssetCompatibility.Candidates(app.Release?.Assets ?? [], app.ShowAllDownloads).Where(a => app.UpdateMethod switch { "Zip" => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase), "ReplaceExe" => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase), "Installer" => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase), _ => true }).ToList();
+    public static string SelectionExplanation(TrackedApp app)
+    {
+        if (!app.CanUpdate || Match(app) != null) return "";
+        if (UpdateCandidates(app).Count == 0) return "Release " + app.Latest + " has no compatible download for this update method. Open the release page or change the update method in settings.";
+        return app.AssetName.Length == 0 ? "Choose the file to use for this update. Your choice will be remembered." : "The saved download, " + app.AssetName + ", could not be matched in release " + app.Latest + ". Choose its replacement to continue.";
+    }
     public static Asset? Match(TrackedApp app)
     {
-        var files = AssetCompatibility.Candidates(app.Release?.Assets ?? [], app.ShowAllDownloads);
+        var files = UpdateCandidates(app);
         if (app.Repo.Length > 0 && Repositories.Resolve(app.Repo).Host == "nexusmods.com") return files.FirstOrDefault(a => a.FileId == (app.Release?.SelectedFileId > 0 ? app.Release.SelectedFileId : app.NexusFileId) && a.FileId > 0);
         var exact = files.FirstOrDefault(a => a.Name == app.AssetName);
         if (exact != null) return exact;
         var family = files.Where(a => Family(a.Name) == Family(app.AssetName)).ToList();
         return family.Count == 1 ? family[0] : null;
     }
-    public static string Label(string method) => method switch { "ReplaceExe" => "Replace app EXE", "Installer" => "Run installer", "Zip" => "Extract ZIP into app folder", _ => "Download only" };
+    public static string Label(string method, bool mod = false) => method switch { "ReplaceExe" => "Replace app EXE", "Installer" => "Run installer", "Zip" => mod ? "Extract ZIP into mod folder" : "Extract ZIP into app folder", _ => "Download only" };
     public static void Validate(TrackedApp app, Asset asset)
     {
         if (app.UpdateMethod is not ("Manual" or "ReplaceExe" or "Installer" or "Zip")) throw new InvalidOperationException("Choose a supported update method in App settings.");

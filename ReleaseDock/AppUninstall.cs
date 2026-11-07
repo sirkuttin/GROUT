@@ -48,9 +48,10 @@ public static class AppUninstall
     {
         var index = library.IndexOf(app);
         if (index < 0 || !CanConfirm(app, registrations)) return false;
-        library.RemoveAt(index);
+        var previous = library.ToDictionary(n => n.Id, n => (n.ParentId, n.SiblingOrder));
+        LibraryTree.RemoveKeepingChildren(library, app);
         try { persist(); }
-        catch { library.Insert(index, app); throw; }
+        catch { library.Insert(index, app); foreach (var node in library) { var saved = previous[node.Id]; node.ParentId = saved.ParentId; node.SiblingOrder = saved.SiblingOrder; } throw; }
         return true;
     }
     public static (string Title, string Message) TrackingPrompt(TrackedApp app)

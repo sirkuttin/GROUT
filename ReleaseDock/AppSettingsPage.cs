@@ -42,12 +42,15 @@ public sealed class AppSettingsPage
             void ShowWebsite() { try { websitePanel.Visibility = Repositories.Resolve(RepositoryKey).IsWebsite ? Visibility.Visible : Visibility.Collapsed; } catch { websitePanel.Visibility = Visibility.Collapsed; } }
             if (repository != null) repository.TextChanged += (_, _) => ShowWebsite(); ShowWebsite();
         }
-        Panel.Children.Add(Ui.Text("App name", 18));
+        var kind = new ComboBox { ItemsSource = new[] { "Application", "Mod" }, SelectedIndex = app.IsMod ? 1 : 0, Padding = new Thickness(8), Margin = new Thickness(0,0,0,12) };
+        LibraryOrganization.ReadableCombo(kind); Name(kind, "Item type"); Panel.Children.Add(Ui.Text("Item type", 18)); Panel.Children.Add(kind);
+        kind.SelectionChanged += (_, _) => { app.ItemKind = kind.SelectedIndex == 1 ? "Mod" : "Application"; };
+        Panel.Children.Add(Ui.Text(app.IsMod ? "Mod name" : "App name", 18));
         appName = Ui.Input(app.AppName); Name(appName, "App name"); Panel.Children.Add(appName);
         customName = !string.IsNullOrWhiteSpace(app.CustomName);
         appName.TextChanged += (_, _) => { if (!updatingName) customName = !string.IsNullOrWhiteSpace(appName.Text); };
         Panel.Children.Add(Ui.Button("Use detected name", (_, _) => { customName = false; Refresh(); }));
-        Panel.Children.Add(Ui.Text("App folder", 18));
+        Panel.Children.Add(Ui.Text(app.IsMod ? "Install folder" : "App folder", 18));
         folder = Ui.Input(draft.Folder); Name(folder, "App folder"); Panel.Children.Add(folder);
         Panel.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new FolderPicker { Title = "Choose the app folder" }; if (picker.ShowDialog(owner) == true) folder.Text = picker.FolderName; }));
         if (draft.Conflict)
@@ -61,7 +64,7 @@ public sealed class AppSettingsPage
         }
         filePanel = new StackPanel { Margin = new Thickness(0, 14, 0, 0) }; filePanel.Children.Add(Ui.Text("App file", 18));
         file = Ui.Input(draft.FileName); Name(file, "App file"); filePanel.Children.Add(file); Panel.Children.Add(filePanel);
-        Panel.Children.Add(Ui.Text("Updates", 18)); method = Ui.Choice(Methods.Select(ReleaseFiles.Label), Math.Max(0, Array.IndexOf(Methods, app.UpdateMethod))); Name(method, "Update method"); Panel.Children.Add(method);
+        Panel.Children.Add(Ui.Text("Updates", 18)); method = Ui.Choice(Methods.Select(key => ReleaseFiles.Label(key, app.IsMod)), Math.Max(0, Array.IndexOf(Methods, app.UpdateMethod))); Name(method, "Update method"); Panel.Children.Add(method);
         zipPanel = new StackPanel(); zipPanel.Children.Add(Ui.Text("ZIP contents", 18));
         zipSelection = Ui.Text(ZipContentPicker.Label(app), muted: true); zipPanel.Children.Add(zipSelection);
         var chooseContents = Ui.Button("Choose ZIP contents…", (_, _) =>
@@ -151,6 +154,7 @@ public sealed class AppSettingsPage
         app.AutoReconcile = automatic.IsChecked == true; app.IncludePrereleases = previews.IsChecked == true;
         if (app.Installed != manual.Text.Trim()) app.InstalledProvenance = "Manually entered installed version";
         app.Installed = manual.Text.Trim();
+        if (!app.AutoReconcile && app.VersionRecord is { } record) app.VersionRecord = record with { Version = app.Installed, Evidence = "Manual" };
         if (assets.SelectedItem is ComboBoxItem { Tag: Asset asset }) { ReleaseFiles.Select(app, asset); if (validate && !sourceChanged) ReleaseFiles.Validate(app, asset); }
         else if (validate && !sourceChanged && Method != "Manual") throw new InvalidOperationException("Choose a release download or use Download only.");
         InstalledVersions.Reconcile(app);

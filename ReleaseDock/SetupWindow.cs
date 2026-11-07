@@ -10,6 +10,9 @@ public sealed class SetupWindow : Window
 {
     private readonly ReleaseClient github;
     private readonly HashSet<string> existing;
+    private readonly List<TrackedApp> knownApps;
+    private readonly bool requestedMod;
+    private readonly string initialParent, inheritedFolder;
     private readonly StackPanel body;
     private readonly bool editing;
     private readonly UpdatePrompts? updatePrompts;
@@ -46,9 +49,11 @@ public sealed class SetupWindow : Window
     public string ExistingRepo { get; private set; } = "";
     private static readonly string[] Methods = ["Manual", "ReplaceExe", "Installer", "Zip"];
 
-    public SetupWindow(ReleaseClient client, IEnumerable<string> tracked, TrackedApp? edit = null, bool preview = false, string previewStage = "existing", UpdatePrompts? updatePrompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null)
+    public SetupWindow(ReleaseClient client, IEnumerable<string> tracked, TrackedApp? edit = null, bool preview = false, string previewStage = "existing", UpdatePrompts? updatePrompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null, IEnumerable<TrackedApp>? trackedApps = null, string? initialLink = null, bool mod = false, string parentId = "", string childDefaultFolder = "")
     {
-        installDiscovery = discovery ?? new();
+        initialParent = parentId; inheritedFolder = childDefaultFolder; Result.ParentId = parentId;
+        installDiscovery = discovery ?? new(); knownApps = (trackedApps ?? []).ToList(); requestedMod = mod;
+        if (mod) Result.ItemKind = "Mod"; if (initialLink != null) Result.Repo = initialLink;
         this.updatePrompts = updatePrompts; this.newWork = newWork;
         github = client; existing = tracked.ToHashSet(StringComparer.OrdinalIgnoreCase); editing = edit != null;
         Title = editing ? "App settings" : "Add App"; Width = 740; Height = 840; MinWidth = 600; MinHeight = 650;
@@ -75,17 +80,23 @@ public sealed class SetupWindow : Window
         else if (preview)
         {
             Result = new() { Repo = "example/desktop-app", Installed = "v1.0.0", Latest = "v1.1.0", InstallLocation = @"C:\Apps\DesktopApp", UpdateTarget = @"C:\Apps\DesktopApp", UpdateMethod = "Installer", Release = new("v1.1.0", "", "", [new("DesktopApp-1.1.0-x64.exe", "", 100000, null)]) };
+            if (previewStage == "mod") { Result.ItemKind = "Mod"; Result.UpdateTarget = ""; Result.InstallLocation = ""; Result.ParentId = parentId; Result.Repo = "https://d2rloader.net/hub/plugins/remote-stash"; Result.CustomName = "Remote Stash"; Result.Installed = ""; Result.Latest = "2.3.5"; Result.Release = new("2.3.5", "", "", [new("RemoteStash-2.3.5.zip", "", 165589, null)]); Result.UpdateMethod = "Zip"; newInstall = true; ScreenTwo(); return; }
             if (previewStage == "first") { ScreenOne(); lookupTimer.Stop(); }
             else { newInstall = previewStage is "install" or "portable"; if (newInstall) { SetupPaths.ClearExistingTracking(Result); Result.UpdateTarget = @"C:\Apps"; if (previewStage == "portable") Result.UpdateMethod = "ReplaceExe"; } ScreenTwo(); }
         }
         else ScreenOne();
     }
+    private bool ModSource(string source) => requestedMod || Result.ItemKind == "Mod" || Repositories.Resolve(source).Host == "d2rloader.net";
+    private void ValidateInstance()
+    {
+        if (knownApps.Any(a => LibraryOrganization.SameInstallation(a, Result))) throw new InvalidOperationException("This source is already tracked at this destination. Choose a different installation folder.");
+    }
     private void ScreenOne()
     {
         firstScreen = true;
         BeginPage();
-        body.Children.Add(Ui.Text("ADD APP · 1 OF 2", 12, true));
-        body.Children.Add(Ui.Text("Find your app", 28));
+        body.Children.Add(Ui.Text(requestedMod ? "ADD MOD · 1 OF 2" : "ADD APP · 1 OF 2", 12, true));
+        body.Children.Add(Ui.Text(requestedMod ? "Find your mod" : "Find your app", 28));
         body.Children.Add(Ui.Text(NexusMods.Enabled ? "Paste a GitHub, Codeberg, GitLab.com, D2RLoader or Nexus Mods link." : "Paste a project link or the website page containing an app download.", muted: true));
         repo.Text = Result.Repo.StartsWith("website:", StringComparison.Ordinal) ? Result.RepositoryUrl : Result.Repo; previews.IsChecked = Result.IncludePrereleases;
         body.Children.Add(Ui.Text("Project or website page URL")); body.Children.Add(repo);
@@ -99,7 +110,7 @@ public sealed class SetupWindow : Window
         installed.IsChecked = !newInstall; fresh.IsChecked = newInstall;
         body.Children.Add(installed); body.Children.Add(fresh);
         message = Ui.Text("Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.", muted: true); body.Children.Add(message);
-        body.Children.Add(Ui.Button("Browse D2RLoader…", (_, _) => { var link = D2RLoaderBrowser.Show(this, github); if (link != null) repo.Text = link; }));
+
         nexusConnect = Ui.Button("Connect Nexus Mods…", (_, _) => { NexusSettings.Show(this); lookedUpRepo = verifiedRepo = ""; lookupTimer.Stop(); lookupTimer.Start(); });
         nexusConnect.Visibility = NexusMods.Enabled && repo.Text.IndexOf("nexusmods.com", StringComparison.OrdinalIgnoreCase) >= 0 ? Visibility.Visible : Visibility.Collapsed; body.Children.Add(nexusConnect);
         var row = new WrapPanel();
@@ -111,7 +122,7 @@ public sealed class SetupWindow : Window
             try
             {
                 var parsed = WebsiteSource.SourceKey(repo.Text);
-                if (existing.Contains(parsed)) { ExistingRepo = parsed; DialogResult = true; return; }
+                if (existing.Contains(parsed) && !ModSource(parsed)) { ExistingRepo = parsed; DialogResult = true; return; }
                 if (lookedUpDownload != websiteDownload.Text.Trim() || lookedUpRepo != parsed || lookedUpChannel != (previews.IsChecked == true)) await Lookup();
                 if (closed || verifiedRepo != parsed || WebsiteSource.SourceKey(repo.Text) != parsed) return;
                 var wantsNew = fresh.IsChecked == true;
@@ -140,12 +151,12 @@ public sealed class SetupWindow : Window
             if (nexusSource && !NexusMods.Enabled) throw new InvalidOperationException("Nexus Mods support is not available in this release yet.");
             previews.Visibility = nexusSource || websiteSource ? Visibility.Collapsed : Visibility.Visible;
             message.Text = websiteSource ? "GROUT checks this page for links matching your download filename, with a newer version number. Choose an EXE installer or portable file on the next screen." : nexusSource ? "Nexus uses the file you choose rather than a release channel. Connect your account to check versions. ZIP extraction is supported; mod dependencies and FOMOD installers are not." : "Preview-only projects need Include preview releases enabled. Existing apps can be tracked even without a usable Windows download.";
-            if (existing.Contains(parsed)) { projectInfo.Text = "Already in your library. Choose Open app."; nextButton!.Content = "Open app"; return; }
+            if (existing.Contains(parsed) && !ModSource(parsed)) { projectInfo.Text = "Already in your library. Choose Open app."; nextButton!.Content = "Open app"; return; }
             nextButton!.Content = "Next →";
             projectInfo.Text = "Finding app…";
             if (verifiedRepo != parsed) { verifiedRepo = ""; await github.VerifyRepository(parsed); verifiedRepo = parsed; }
-            if (Result.Repo.Length > 0 && !Result.Repo.Equals(parsed, StringComparison.OrdinalIgnoreCase)) { Result = new(); installAttempted = false; methodChosen = false; installerCompletion = false; }
-            Result.Repo = parsed; Result.WebsiteDownloadUrl = websiteSource ? seedInput : ""; Result.IncludePrereleases = channel; Result.Release = null; Result.Latest = "";
+            if (Result.Repo.Length > 0 && !Result.Repo.Equals(parsed, StringComparison.OrdinalIgnoreCase)) { Result = new() { ItemKind = requestedMod ? "Mod" : "", ParentId = initialParent }; installAttempted = false; methodChosen = false; installerCompletion = false; }
+            Result.Repo = parsed; Title = Result.IsMod ? "Add mod" : "Add App"; installed.Content = Result.IsMod ? "Track existing mod" : "Track an app already installed"; fresh.Content = Result.IsMod ? "Install mod" : "Install this app"; Result.WebsiteDownloadUrl = websiteSource ? seedInput : ""; Result.IncludePrereleases = channel; Result.Release = null; Result.Latest = "";
             try
             {
                 var release = await github.Latest(parsed, channel, websiteDownloadUrl: Result.WebsiteDownloadUrl);
@@ -171,7 +182,7 @@ public sealed class SetupWindow : Window
         firstScreen = false; lookupTimer.Stop();
         if (newInstall) { if (installerCompletion) InstallerCompletion(); else NewInstallScreen(); return; }
         BeginPage();
-        body.Children.Add(Ui.Text(editing ? "APP SETTINGS" : "ADD APP · 2 OF 2", 12, true));
+        body.Children.Add(Ui.Text(editing ? (Result.IsMod ? "MOD SETTINGS" : "APP SETTINGS") : (Result.IsMod ? "ADD MOD · 2 OF 2" : "ADD APP · 2 OF 2"), 12, true));
         body.Children.Add(Ui.Text(Result.ProjectLabel, 26));
         body.Children.Add(Ui.Text("Latest release: " + (Result.Latest.Length > 0 ? Result.Latest : "unavailable"), muted: true));
         var editor = new AppSettingsPage(this, Result, allowRepositoryEdit: editing, client: github); body.Children.Add(editor.Panel);
@@ -182,7 +193,7 @@ public sealed class SetupWindow : Window
             try { if (editing) Close(); else { editor.Save(false); ScreenOne(); } }
             catch (Exception ex) { message.Text = ex.Message; }
         }));
-        row.Children.Add(Ui.Button(editing ? "Save settings" : "Add App", async (_, _) =>
+        row.Children.Add(Ui.Button(editing ? "Save settings" : (Result.IsMod ? "Add mod" : "Add App"), async (_, _) =>
         {
             if (working) return;
             working = true; row.IsEnabled = false;
@@ -191,11 +202,11 @@ public sealed class SetupWindow : Window
                 var source = editor.RepositoryKey;
                 if (editing && !source.Equals(Result.Repo, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (existing.Contains(source)) throw new InvalidOperationException("That repository is already tracked. Choose its existing library entry instead.");
+                    if (knownApps.Any(a => LibraryOrganization.SameInstallation(a, Result)) || existing.Contains(source) && !Result.IsMod) throw new InvalidOperationException("That repository is already tracked. Choose its existing library entry instead.");
                     message.Text = "Checking the new repository…"; await github.VerifyRepository(source);
                 }
                 if (Repositories.Resolve(source).IsWebsite) { message.Text = "Checking website download…"; await github.Latest(source, websiteDownloadUrl: editor.WebsiteDownloadUrl); }
-                editor.Save(); working = false; completed = true; DialogResult = true;
+                editor.Save(); ValidateInstance(); working = false; completed = true; DialogResult = true;
             }
             catch (Exception ex) { message.Text = ex.Message; }
             finally { working = false; row.IsEnabled = true; }
@@ -207,6 +218,7 @@ public sealed class SetupWindow : Window
         if (body.Parent is ScrollViewer old) old.Content = null;
         Content = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         body.Children.Clear();
+        if (!editing) { var parent = knownApps.FirstOrDefault(n => n.Id == Result.ParentId); body.Children.Add(Ui.Text("Add to: " + (parent != null ? LibraryTree.Breadcrumb(parent, knownApps) : "Library"), muted: true)); }
     }
     private void FixedFooter(WrapPanel actions)
     {
@@ -218,8 +230,8 @@ public sealed class SetupWindow : Window
     private void NewInstallScreen()
     {
         BeginPage();
-        body.Children.Add(Ui.Text("ADD APP · 2 OF 2", 12, true));
-        body.Children.Add(Ui.Text("Install " + Result.ProjectLabel, 26));
+        body.Children.Add(Ui.Text(Result.IsMod ? "ADD MOD · 2 OF 2" : "ADD APP · 2 OF 2", 12, true));
+        body.Children.Add(Ui.Text("Install " + (Result.IsMod ? Result.AppName : Result.ProjectLabel), 26));
         body.Children.Add(Ui.Text("Release " + Result.Latest, muted: true));
         if (Result.Release?.SourceWarning.Length > 0) { var warning = Ui.Text(Result.Release.SourceWarning); warning.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 212, 149)); body.Children.Add(warning); }
         body.Children.Add(Ui.Text("Download", 18));
@@ -242,8 +254,9 @@ public sealed class SetupWindow : Window
         ComboBox? use = null; TextBox? folder = null, filename = null;
         string selectedMethod = "";
         string destinationFolder = Directory.Exists(Result.UpdateTarget) || !Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Result.UpdateTarget : Framework.GetDirectoryName(Result.UpdateTarget) ?? "";
-        if (destinationFolder.Length == 0) destinationFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "apps");
-        if (Result.UpdateMethod == "Zip" && Result.UpdateTarget.Length > 0 && Framework.GetDirectoryName(Result.UpdateTarget) is { Length: > 0 } zipParent && string.Equals(SetupPaths.PortableZip(zipParent, Result.AppName), Result.UpdateTarget, StringComparison.OrdinalIgnoreCase)) destinationFolder = zipParent;
+        if (destinationFolder.Length == 0 && inheritedFolder.Length > 0) destinationFolder = inheritedFolder;
+        if (destinationFolder.Length == 0 && !Result.IsMod) destinationFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "apps");
+        if (!Result.IsMod && Result.UpdateMethod == "Zip" && Result.UpdateTarget.Length > 0 && Framework.GetDirectoryName(Result.UpdateTarget) is { Length: > 0 } zipParent && string.Equals(SetupPaths.PortableZip(zipParent, Result.AppName), Result.UpdateTarget, StringComparison.OrdinalIgnoreCase)) destinationFolder = zipParent;
         string chosenFilename = Result.UpdateTarget.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(Result.UpdateTarget) : "";
         void Configure()
         {
@@ -280,7 +293,7 @@ public sealed class SetupWindow : Window
                 destination.Children.Clear(); folder = null; filename = null; message.Text = "";
                 if (selectedMethod is "ReplaceExe" or "Zip")
                 {
-                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "Save in folder" : "Create app folder inside", 18));
+                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "Save in folder" : Result.IsMod ? "Install folder" : "Create app folder inside", 18));
                     folder = Ui.Input(destinationFolder); System.Windows.Automation.AutomationProperties.SetName(folder, "Save in folder"); destination.Children.Add(folder);
                     destination.Children.Add(Ui.Button("Browse…", (_, _) => { var picker = new FolderPicker { Title = "Choose where to save the app" }; if (picker.ShowDialog(this) == true) folder.Text = picker.FolderName; }));
                     if (selectedMethod == "ReplaceExe")
@@ -304,16 +317,16 @@ public sealed class SetupWindow : Window
                         try
                         {
                             destinationFolder = folder.Text; chosenFilename = filename?.Text ?? "";
-                            var finalPath = selectedMethod == "ReplaceExe" ? SetupPaths.PortableExe(folder.Text, filename!.Text) : SetupPaths.PortableZip(folder.Text, Result.AppName);
+                            var finalPath = selectedMethod == "ReplaceExe" ? SetupPaths.PortableExe(folder.Text, filename!.Text) : Result.IsMod ? LibraryOrganization.ModDestination(folder.Text) : SetupPaths.PortableZip(folder.Text, Result.AppName);
                             Result.UpdateTarget = finalPath;
                             ReleaseFiles.Validate(Result, asset);
-                            path.Text = (selectedMethod == "ReplaceExe" ? "Will save:\n" : "Will extract into:\n") + finalPath; message.Text = ""; finish.IsEnabled = !working;
+                            path.Text = (Result.IsMod ? "Files will be copied into:\n" : selectedMethod == "ReplaceExe" ? "Will save:\n" : "Will extract into:\n") + finalPath; message.Text = ""; finish.IsEnabled = !working;
                         }
                         catch (Exception ex) { Result.UpdateTarget = ""; path.Text = ""; message.Text = ex.Message; finish.IsEnabled = false; }
                     }
                     folder.TextChanged += (_, _) => Validate(); if (filename != null) filename.TextChanged += (_, _) => Validate(); Validate();
-                    finish.Content = selectedMethod == "ReplaceExe" ? "Save and add app" : "Extract and add app";
-                    destination.Children.Add(Ui.Text(selectedMethod == "ReplaceExe" ? "The EXE will be saved here without being run. Future updates replace this same file." : "GROUT will create a subfolder named after the app. Future updates use that app folder. Files included in the ZIP overwrite existing files.", muted: true));
+                    finish.Content = Result.IsMod ? "Install mod" : selectedMethod == "ReplaceExe" ? "Save and add app" : "Extract and add app";
+                    destination.Children.Add(Ui.Text(Result.IsMod ? "The selected ZIP contents go directly into this folder. Included files overwrite matching files; no extra app-named folder is created." : selectedMethod == "ReplaceExe" ? "The EXE will be saved here without being run. Future updates replace this same file." : "GROUT will create a subfolder named after the app. Future updates use that app folder. Files included in the ZIP overwrite existing files.", muted: true));
                 }
                 else
                 {
@@ -349,7 +362,7 @@ public sealed class SetupWindow : Window
             operation = new(); cancel.Visibility = Visibility.Visible;
             try
             {
-                Result.UpdateMethod = selectedMethod; ReleaseFiles.Select(Result, asset);
+                Result.UpdateMethod = selectedMethod; ReleaseFiles.Select(Result, asset); ValidateInstance();
                 var outcome = await UpdateRunner.Run(this, Result, asset, github, (text, progress) => { message.Text = text + (progress < 100 ? $" {progress:F0}%" : ""); cancel.IsEnabled = text.StartsWith("Downloading") || text.StartsWith("Inspecting ZIP"); }, () => { }, operation.Token, newInstall: true, prompts: updatePrompts, newWork: newWork, discovery: installDiscovery, preparedZip: preparedZip);
                 installAttempted = Result.DownloadedPath.Length > 0;
                 if (outcome == UpdateOutcome.Deferred) { message.Text = "Nothing was installed or added. Your download is ready; you can retry."; return; }
@@ -372,7 +385,7 @@ public sealed class SetupWindow : Window
     private void InstallerCompletion()
     {
         BeginPage();
-        body.Children.Add(Ui.Text("ADD APP · 2 OF 2", 12, true));
+        body.Children.Add(Ui.Text(Result.IsMod ? "ADD MOD · 2 OF 2" : "ADD APP · 2 OF 2", 12, true));
         body.Children.Add(Ui.Text(Result.UpdateMethod == "Installer" ? "Finish tracking your installation" : "Download saved", 26));
         if (Result.UpdateMethod == "Installer")
         {
@@ -382,7 +395,7 @@ public sealed class SetupWindow : Window
             {
                 candidates.Children.Clear();
                 foreach (var candidate in Result.InstallCandidates)
-                    candidates.Children.Add(Ui.Button("Use " + candidate.Label, (_, _) => { InstallDiscovery.Apply(Result, candidate); if (string.IsNullOrWhiteSpace(candidate.Entry.Version)) InstalledVersions.RecordInstallerWithoutVersion(Result, candidate.Entry.Id); completed = true; DialogResult = true; }));
+                    candidates.Children.Add(Ui.Button("Use " + candidate.Label, (_, _) => { InstallDiscovery.Apply(Result, candidate); InstalledVersions.RecordAppliedInstaller(Result, candidate.Entry.Id); completed = true; DialogResult = true; }));
             }
             ShowCandidates();
             body.Children.Add(Ui.Button("Find installation", async (_, _) =>
@@ -394,7 +407,7 @@ public sealed class SetupWindow : Window
                     if (InstallDiscovery.ClearMatch(Result.InstallCandidates) is { } match)
                     {
                         InstallDiscovery.Apply(Result, match);
-                        if (match.Changed && string.IsNullOrWhiteSpace(match.Entry.Version)) InstalledVersions.RecordInstallerWithoutVersion(Result, match.Entry.Id);
+                        if (match.Changed || Result.IsCurrent) InstalledVersions.RecordAppliedInstaller(Result, match.Entry.Id);
                         if (InstallDiscovery.CanFinish(Result)) { working = false; completed = true; DialogResult = true; return; }
                     }
                     discoveryInfo.Text = Result.InstallCandidates.Count > 0 ? "Choose the matching installation below." : "No matching registered installation found. Choose its folder or EXE below."; ShowCandidates();
@@ -411,7 +424,7 @@ public sealed class SetupWindow : Window
         version.TextChanged += (_, _) => { if (version.IsKeyboardFocusWithin) automatic.IsChecked = false; };
         message = Ui.Text("", muted: true);
         var row = new WrapPanel(); row.Children.Add(Ui.Button("← Back", (_, _) => { installerCompletion = false; NewInstallScreen(); }));
-        row.Children.Add(Ui.Button("Add to library", (_, _) => { Result.InstallLocation = location.Text.Trim(); Result.Installed = version.Text.Trim(); Result.AutoReconcile = automatic.IsChecked == true; if (Result.AutoReconcile) InstalledVersions.Reconcile(Result); if (Result.PendingInstallerRelease == Result.Latest && version.Text.Trim().Length == 0) InstalledVersions.RecordInstallerWithoutVersion(Result); completed = true; DialogResult = true; }));
+        row.Children.Add(Ui.Button("Add to library", (_, _) => { Result.InstallLocation = location.Text.Trim(); Result.Installed = version.Text.Trim(); Result.AutoReconcile = automatic.IsChecked == true; if (Result.AutoReconcile) InstalledVersions.Reconcile(Result); if (Result.PendingInstallerRelease == Result.Latest) { var chosenVersion = version.Text.Trim(); InstalledVersions.RecordAppliedInstaller(Result); if (chosenVersion.Length > 0 && !InstalledVersions.Matches(chosenVersion, Result.Latest) && Result.VersionRecord is { } record) { Result.VersionRecord = record with { Version = chosenVersion, Evidence = "Manual" }; Result.Installed = chosenVersion; Result.AutoReconcile = false; } } completed = true; DialogResult = true; }));
         FixedFooter(row);
     }
     private void PickLocation(bool file)
