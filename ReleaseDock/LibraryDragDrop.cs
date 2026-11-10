@@ -23,6 +23,22 @@ public partial class MainWindow
             if (current is System.Windows.Controls.Primitives.ButtonBase) return;
         treeDragCandidate = (ItemsControl.ContainerFromElement(Library, source) as ListBoxItem)?.DataContext as TrackedApp;
         treeDragStart = e.GetPosition(Library);
+        if (treeDragCandidate?.IsGroup == true) e.Handled = true;
+    }
+    private void TreeMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        var node = treeDragCandidate; treeDragCandidate = null;
+        if (e.ChangedButton != MouseButton.Left || treeDragging || node?.IsGroup != true || e.OriginalSource is not DependencyObject source) return;
+        for (var current = source; current != null && current is not ListBoxItem; current = TreeParent(current))
+            if (current is System.Windows.Controls.Primitives.ButtonBase) return;
+        var point = e.GetPosition(Library);
+        var releasedNode = (ItemsControl.ContainerFromElement(Library, source) as ListBoxItem)?.DataContext as TrackedApp;
+        if (CompleteGroupHeaderClick(node, releasedNode, treeDragStart, point)) e.Handled = true;
+    }
+    internal bool CompleteGroupHeaderClick(TrackedApp node, TrackedApp? releasedNode, Point pressed, Point released)
+    {
+        if (!node.IsGroup || releasedNode != node || Math.Abs(released.X - pressed.X) >= SystemParameters.MinimumHorizontalDragDistance || Math.Abs(released.Y - pressed.Y) >= SystemParameters.MinimumVerticalDragDistance) return false;
+        ToggleGroupHeader(node); return true;
     }
     private void TreeMouseMove(object sender, MouseEventArgs e)
     {

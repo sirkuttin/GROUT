@@ -4,7 +4,7 @@
 
 **Git Release Observer & Update Tool**
 
-The updater your apps are missing.
+Filling the gaps in app updates.
 
 Great apps on Git repositories do not always include an updater. GROUT fills that gap on Windows: track apps you already have, or install new ones from releases on **GitHub, Codeberg.org and GitLab.com**. Also supports [D2RLoader mods](docs/d2rloader.md).
 
@@ -12,7 +12,7 @@ Great apps on Git repositories do not always include an updater. GROUT fills tha
 
 <img src="docs/images/library.png" alt="GROUT library showing installed and latest versions with update controls" width="850">
 
-*GROUT 0.10.0 interface with sample data.*
+*Current interface with sample data.*
 
 > **Nexus Mods:** integration is under development and disabled in public builds pending application registration. See the [Nexus guide](docs/nexus-mods.md).
 
@@ -31,7 +31,7 @@ GROUT also supports [website download tracking](docs/supported-sources.md#websit
 ## Get started
 
 1. Download **GROUT.exe** from the [latest release](https://github.com/sirkuttin/GROUT/releases/latest), save it in a permanent writable folder, and run it.
-2. Choose **Add App**, paste a supported repository or release link, then choose to track an existing app or install it.
+2. Choose **+ Add… → Add app…**, paste a supported repository or release link, then choose to track an existing app or install it.
 3. Choose the Windows download and how updates should work. GROUT shows the destination before applying file updates; ZIPs and portable EXEs overwrite matching files directly.
 
 The Windows x64 download is a **single portable EXE under 1 MB**. It uses **.NET Framework 4.8**, already included with Windows 11, instead of bundling a runtime. No installer or adjacent DLLs are required. Your library and settings live in AppData; see [storage and cleanup](docs/user-guide.md#storage-and-cleanup).
@@ -47,6 +47,8 @@ The Windows x64 download is a **single portable EXE under 1 MB**. It uses **.NET
 | [Troubleshooting](docs/troubleshooting.md) | Missing apps, disabled updates and interrupted operations |
 | [Development](docs/development.md) | Build from source, packaged tests and diagnostic commands |
 | [Publishing releases](docs/releasing.md) | The C# script and verified GitHub publishing workflow |
+| [Roadmap](ROADMAP.md) | Product direction, near-term priorities and future candidates |
+| [Backlog](BACKLOG.md) | Task status, acceptance criteria and dependencies |
 
 ## License and security
 

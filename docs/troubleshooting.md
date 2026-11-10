@@ -41,6 +41,18 @@ Some installers are unregistered, use unrelated names, spawn longer-lived proces
 
 Several plausible registrations require an explicit choice. During an update, GROUT does not silently redirect a configured app to a different folder.
 
+## GROUT is waiting for an installer
+
+Choose **Stop waiting** to return control to GROUT. The installer continues independently; stopping the wait does not cancel, uninstall or confirm it. GROUT keeps the package and its last recorded version, and does not create a successful-installation record from a later exit after detaching.
+
+When the installer finishes, recheck its version or choose its installation in Settings/setup. If it failed, you can retry deliberately. A successful version check or manual version confirmation clears the unresolved-wait warning.
+
+## GROUT cannot load saved data
+
+The recovery screen identifies the affected library or settings file. GROUT pauses saving and update checks and leaves those files unchanged. Choose **Open data folder**, correct the file or replace it with a known-good copy, then choose **Retry loading**. Invalid data stays on the recovery screen; valid data reopens the library.
+
+Deleting a configuration file starts an empty library or default settings; it does not recover the old data. GROUT does not automatically reset or overwrite damaged configuration. An unreadable installation-version record is a per-item warning rather than a reason to erase the library.
+
 ## Replacement or extraction failed
 
 Close the app being updated and check write access. GROUT does not forcibly close third-party apps or silently elevate file replacement. Windows can lock running EXEs or protected folders.
@@ -55,7 +67,7 @@ ZIP installs and updates apply every archive file directly, including matching s
 
 ## Notifications or startup do not behave as expected
 
-- Closing the window keeps GROUT in the tray; **Exit** stops checks.
+- **When I close GROUT** in Settings chooses whether closing keeps GROUT in the tray or exits it. **Exit** stops checks; active operations/dialogs must finish first.
 - **Quiet mode**, Windows notification settings and Do Not Disturb can suppress alerts.
 - Each release tag is announced once; quiet discoveries do not create a later backlog.
 - **Start GROUT with Windows** is optional and starts hidden at sign-in. After moving/renaming the EXE, toggle it off and on to save its new path.

@@ -4,7 +4,7 @@ using System.Windows;
 
 namespace ReleaseDock;
 
-public enum UpdateOutcome { Downloaded, Deferred, FilesApplied, InstallerReturned }
+public enum UpdateOutcome { Downloaded, Deferred, FilesApplied, InstallerReturned, InstallerWaitStopped }
 
 public sealed class UpdatePrompts
 {
@@ -17,14 +17,14 @@ public sealed class UpdatePrompts
 
 public static class UpdateRunner
 {
-    public static async Task<UpdateOutcome> Run(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel = default, bool newInstall = false, UpdatePrompts? prompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null, PreparedZip? preparedZip = null)
+    public static async Task<UpdateOutcome> Run(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel = default, bool newInstall = false, UpdatePrompts? prompts = null, Func<string, string>? newWork = null, InstallDiscovery? discovery = null, PreparedZip? preparedZip = null, Action<bool>? installerWaiting = null)
     {
         var allocate = newWork ?? AppPaths.NewWork;
         var allocated = new List<(string Category, string Folder)>();
         UpdateOutcome? outcome = null;
         try
         {
-            outcome = await RunCore(owner, app, asset, github, status, persist, cancel, newInstall, prompts, category => { var folder = allocate(category); allocated.Add((category, folder)); return folder; }, discovery, preparedZip);
+            outcome = await RunCore(owner, app, asset, github, status, persist, cancel, newInstall, prompts, category => { var folder = allocate(category); allocated.Add((category, folder)); return folder; }, discovery, preparedZip, installerWaiting);
             return outcome.Value;
         }
         finally
@@ -38,7 +38,7 @@ public static class UpdateRunner
             persist();
         }
     }
-    private static async Task<UpdateOutcome> RunCore(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel, bool newInstall, UpdatePrompts? prompts, Func<string, string>? newWork, InstallDiscovery? discovery, PreparedZip? preparedZip)
+    private static async Task<UpdateOutcome> RunCore(Window owner, TrackedApp app, Asset asset, ReleaseClient github, Action<string, double> status, Action persist, CancellationToken cancel, bool newInstall, UpdatePrompts? prompts, Func<string, string>? newWork, InstallDiscovery? discovery, PreparedZip? preparedZip, Action<bool>? installerWaiting)
     {
         prompts ??= new(); newWork ??= AppPaths.NewWork;
         ReleaseFiles.Validate(app, asset);
@@ -71,10 +71,26 @@ public static class UpdateRunner
         {
             if (!prompts.RunInstaller(owner, asset)) return UpdateOutcome.Deferred;
             discovery ??= new(); var before = await Task.Run(discovery.Snapshot); app.InstallationBefore = before; app.InstallationLocated = false;
-            app.UpdateState = "Installer started — installation not yet verified"; persist();
-            status(app.UpdateState, 100);
+            cancel.ThrowIfCancellationRequested();
             app.PendingInstallerRelease = "";
-            await prompts.ExecuteInstaller(path);
+            app.UpdateState = "Installer started — installation not yet verified"; persist();
+            bool returned;
+            try
+            {
+                var execution = prompts.ExecuteInstaller(path);
+                installerWaiting?.Invoke(true);
+                status("Waiting for installer. Stop waiting leaves the installer running.", 100);
+                returned = await InstallerWait.Complete(execution, cancel);
+            }
+            finally { installerWaiting?.Invoke(false); }
+            if (!returned)
+            {
+                app.InstallerWaitStopped = true;
+                app.InstallDiscoveryNote = app.UpdateState = "Stopped waiting. The installer may still be running. Check the installed version when it finishes, or find its installation in Settings.";
+                persist(); status(app.UpdateState, 100);
+                return UpdateOutcome.InstallerWaitStopped;
+            }
+            app.InstallerWaitStopped = false;
             app.PendingInstallerRelease = app.Latest;
             status("Looking for the installed app…", 100);
             for (var attempt = 0; attempt < 4; attempt++)

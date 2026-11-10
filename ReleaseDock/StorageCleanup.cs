@@ -66,7 +66,7 @@ public static class StorageCleanup
                 // Cache ownership does not override a saved live-app/version path.
                 // This also protects libraries created before destination checks existed.
                 if (installationPaths.Any(path => Overlaps(folder, path))) continue;
-                if (category == "downloads" && list.Any(a => !a.IsCurrent && Framework.GetDirectoryName(a.DownloadedPath)?.Equals(folder, StringComparison.OrdinalIgnoreCase) == true)) continue;
+                if (category == "downloads" && list.Any(a => (a.InstallerWaitStopped || !a.IsCurrent) && Framework.GetDirectoryName(a.DownloadedPath)?.Equals(folder, StringComparison.OrdinalIgnoreCase) == true)) continue;
                 if (category == "backups" && !SafeBackup(folder)) continue;
                 DeleteFolder(folder, root);
             }

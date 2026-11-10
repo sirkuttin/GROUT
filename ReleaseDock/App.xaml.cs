@@ -75,7 +75,7 @@ public partial class App : Application
             }
             if (e.Args is ["--self-test", var report])
             {
-                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {TreeMoveTests.Assertions} tree move, {DownloadChoiceTests.Assertions} download recovery, {LibraryOrganizationTests.Assertions} library organization, {VersionRecordTests.Assertions} version record, {WebsiteSourceTests.Assertions} website, {D2RLoaderTests.Assertions} D2RLoader, {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
+                try { await SelfTests.Run(); File.WriteAllText(report, $"PASS: regression suite; {TreeMoveTests.Assertions} tree move, {ReleaseCheckTests.Assertions} release check cancellation, {InstallerWaitTests.Assertions} installer wait, {DataRecoveryTests.Assertions} data recovery, {MessageRoutingTests.Assertions} message routing, {AccessibilityTests.Assertions} accessibility/layout, {GroupHeaderTests.Assertions} group headers, {CloseBehaviorTests.Assertions} close behavior, {SidebarPolishTests.Assertions} sidebar/menu, {ManualVersionDraftTests.Assertions} manual version draft, {DownloadChoiceTests.Assertions} download recovery, {LibraryOrganizationTests.Assertions} library organization, {VersionRecordTests.Assertions} version record, {WebsiteSourceTests.Assertions} website, {D2RLoaderTests.Assertions} D2RLoader, {NexusTests.Assertions} Nexus, {FrameworkTests.Assertions} Framework compatibility, {SelfUpdateTests.Assertions} self-update, {ZipSelectionTests.Assertions} ZIP selection, {ZipFolderTests.Assertions} ZIP folder, {MissingInstallationTests.Assertions} missing installation, {StorageCleanupTests.Assertions} cleanup, {AppIdentityTests.Assertions} naming/uninstall, {AssetCompatibilityTests.Assertions} download compatibility, {FeatureTests.Assertions} feature, {WizardTests.Assertions} wizard/tray, {PortableInstallTests.Assertions} portable installation, {AppSettingsTests.Assertions} app settings, {SourceTests.Assertions} source, {SourceWizardTests.Assertions} source wizard, and {InstallDiscoveryTests.Assertions} install discovery assertions passed."); Shutdown(0); }
                 catch (Exception ex) { File.WriteAllText(report, ex.ToString()); Shutdown(1); }
                 return;
             }
@@ -102,6 +102,10 @@ public partial class App : Application
                 }
                 if (e.Args[0] is "--preview-mods" or "--preview-tree-drag") window.PreviewModLibrary();
                 if (e.Args[0] == "--preview-collapsed") window.PreviewCollapsedGroups();
+                if (e.Args[0] != "--preview-tree-drag")
+                {
+                    SaveHeadlessPreview(window, output); window.Close(); Shutdown(); return;
+                }
                 window.Show();
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 if (e.Args[0] == "--preview-tree-drag") { window.PreviewTreeDropCue(); await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Render); }
@@ -165,9 +169,26 @@ public partial class App : Application
         if (selfRestart)
         {
             await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            if (main.IsEnabled && main.IsLoaded) SelfUpdateHandoff.ConfirmStarted(e.Args[2], int.Parse(e.Args[4]));
+            if (main.LibraryReady && main.IsEnabled && main.IsLoaded) SelfUpdateHandoff.ConfirmStarted(e.Args[2], int.Parse(e.Args[4]));
             else Shutdown(1);
         }
+    }
+    internal static void SaveHeadlessPreview(Window window, string output)
+    {
+        var root = (FrameworkElement)window.Content;
+        var size = new Size(window.Width, window.Height);
+        root.Measure(size); root.Arrange(new Rect(size)); root.UpdateLayout();
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen())
+        {
+            drawing.DrawRectangle(window.Background, null, new Rect(size));
+            var offset = VisualTreeHelper.GetOffset(root);
+            var brush = new VisualBrush(root) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(new Point(offset.X, offset.Y), root.RenderSize) };
+            drawing.DrawRectangle(brush, null, new Rect(new Point(root.Margin.Left, root.Margin.Top), root.RenderSize));
+        }
+        var bitmap = new RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(output); encoder.Save(file);
     }
     internal static void SavePreview(FrameworkElement window, string output)
     {

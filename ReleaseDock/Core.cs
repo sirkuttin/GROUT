@@ -19,15 +19,21 @@ public sealed class TrackedApp
     [JsonIgnore] public int TreeOrder { get; set; }
     [JsonIgnore] public bool TreeVisible { get; set; } = true;
     [JsonIgnore] public bool HasChildren { get; set; }
+    [JsonIgnore] public bool TreeFilterExpanded { get; set; }
+    [JsonIgnore] public bool CanToggleTree => HasChildren && !TreeFilterExpanded;
+    [JsonIgnore] public string TreeToggleHint => !HasChildren ? "Use Left arrow to select the parent." : TreeFilterExpanded ? "Clear search and Updates only to collapse this branch." : Expanded ? "Expanded. Left arrow collapses; Right arrow selects the first child." : "Collapsed. Right arrow expands.";
+    [JsonIgnore] public string LibraryAutomationName => AppName + (HasChildren ? Expanded || TreeFilterExpanded ? ", expanded" : ", collapsed" : "") + (LibraryStatus.Length > 0 ? ", " + LibraryStatus : "");
+    [JsonIgnore] public string OptionsName => "Options for " + AppName;
+    [JsonIgnore] public string TreeToggleName => (Expanded || TreeFilterExpanded ? "Expanded: " : "Collapsed: ") + AppName;
     [JsonIgnore] public int BranchItemCount { get; set; }
     [JsonIgnore] public int BranchUpdateCount { get; set; }
     [JsonIgnore] public int BranchIssueCount { get; set; }
-    [JsonIgnore] public bool ShowBranchSummary => HasChildren && !Expanded;
+    [JsonIgnore] public bool ShowBranchSummary => HasChildren && !Expanded && !TreeFilterExpanded;
     [JsonIgnore] public string BranchSummary => BranchItemCount == 0 ? "" : BranchUpdateCount > 0 ? BranchUpdateCount + (BranchUpdateCount == 1 ? " update" : " updates") + (BranchIssueCount > 0 ? " · " + BranchIssueCount + (BranchIssueCount == 1 ? " issue" : " issues") : "") : BranchIssueCount > 0 ? BranchIssueCount + (BranchIssueCount == 1 ? " issue" : " issues") : "All up to date";
     [JsonIgnore] public string LibraryStatus => ShowBranchSummary ? BranchSummary : DisplayStatus;
     [JsonIgnore] public string LibraryStatusColor => ShowBranchSummary ? BranchIssueCount > 0 ? "#F0D495" : "#76DCC6" : StatusColor;
     [JsonIgnore] public string LibraryStatusHint => ShowBranchSummary ? $"{BranchItemCount} tracked item(s) in this branch. Includes this item and all descendants. Expand to see individual statuses." : Error;
-    [JsonIgnore] public string TreeGlyph => HasChildren ? Expanded ? "▾" : "▸" : "";
+    [JsonIgnore] public string TreeGlyph => HasChildren ? Expanded || TreeFilterExpanded ? "▾" : "▸" : "";
     [JsonIgnore] public System.Windows.Thickness TreeMargin => new(8 + TreeDepth * 16, 10, 8, 10);
     public string Repo { get; set; } = "";
     [JsonIgnore] public string RepositoryUrl => Repo.Length > 0 ? Repositories.Resolve(Repo).WebUrl : "";
@@ -66,7 +72,10 @@ public sealed class TrackedApp
     public string InstalledProvenance { get; set; } = "";
     public string VersionRecordId { get; set; } = "";
     [JsonIgnore] public InstalledReleaseRecord? VersionRecord { get; set; }
+    [JsonIgnore] public string VersionRecordError { get; set; } = "";
     public string PendingInstallerRelease { get; set; } = "";
+    public bool InstallerWaitStopped { get; set; }
+    [JsonIgnore] public string ActiveOperation { get; set; } = "";
     public string AppFolder { get; set; } = "";
     public string AppFile { get; set; } = "";
     public string VersionSourceOverride { get; set; } = "";
@@ -91,7 +100,7 @@ public sealed class TrackedApp
     [JsonIgnore] public bool CanUpdate => !UninstallPending && !InstallationMissing && Installed.Length > 0 && Latest.Length > 0 && (!IsCurrent || PartialUpdate) && !IsOlderRelease && Error.Length == 0 && !(AutoReconcile && LocalError) && Release?.Tag == Latest;
     [JsonIgnore] public string Status => UninstallPending ? "Uninstall pending" : InstallationMissing ? "App not found" : Error.Length > 0 ? "Update check failed" : AutoReconcile && LocalError ? "Installed version unverified" : PartialUpdate ? "Partial update — review files" : Latest.Length == 0 ? "Not checked" : Installed.Length == 0 ? "Version unknown" : IsCurrent ? "Up to date" : IsOlderRelease ? "Installed version is newer" : InstalledVersions.CompareVersionNumbers(Installed, Latest) is < 0 ? "Update available" : "Different release available";
     [JsonIgnore] public string Versions => $"{(InstallationMissing ? "Last known version" : "Installed")}: {(Installed.Length == 0 ? "unknown" : Installed)}    →    Latest: {(Latest.Length == 0 ? "unknown" : Latest)}";
-    [JsonIgnore] public string DisplayStatus => IsGroup ? "" : CanUpdate && ReleaseFiles.Match(this) == null ? ReleaseFiles.UpdateCandidates(this).Count > 0 ? "Choose download" : "No compatible download" : Status;
+    [JsonIgnore] public string DisplayStatus => ActiveOperation.Length > 0 ? "Updating…" : IsGroup ? "" : CanUpdate && ReleaseFiles.Match(this) == null ? ReleaseFiles.UpdateCandidates(this).Count > 0 ? "Choose download" : "No compatible download" : Status;
 }
 public sealed record Asset(string Name, string Url, long Size, string? Digest, string? OriginHost = null, long FileId = 0, string Version = "");
 public sealed record Release(string Tag, string Url, string Notes, List<Asset> Assets, long SelectedFileId = 0, string Title = "", string SourceWarning = "");
@@ -100,7 +109,7 @@ public sealed class Store(string path)
 {
     public List<TrackedApp> Load()
     {
-        var apps = File.Exists(path) ? JsonSerializer.Deserialize<List<TrackedApp>>(File.ReadAllText(path)) ?? [] : [];
+        var apps = File.Exists(path) ? JsonSerializer.Deserialize<List<TrackedApp>>(File.ReadAllText(path)) ?? throw new JsonException("The saved library must contain a list of items, not null.") : [];
         InstalledReleaseRecords.Load(Path.GetDirectoryName(Path.GetFullPath(path))!, apps); return apps;
     }
     public void Save(IEnumerable<TrackedApp> apps)

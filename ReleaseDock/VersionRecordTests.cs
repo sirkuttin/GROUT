@@ -92,6 +92,32 @@ public static class VersionRecordTests
             File.WriteAllText(info, """{"version":"3.1.1"}"""); nativeApp.Latest = "3.1.1";
             InstalledVersions.RecordAppliedZip(nativeApp, [new UpdateFile { Target = info, Relative = "modinfo.json", Source = info }]); store.Save([nativeApp]);
             Check(nativeApp.VersionRecord?.Version == "3.1.1" && nativeApp.VersionRecord.NativeVersion == "3.1.1" && File.Exists(InstalledReleaseRecords.FilePath(Path.Combine(root, "data"), nativeApp.VersionRecordId)), "Even readable matching metadata receives a permanent installation record");
+            File.WriteAllText(info, """{"version":"3.1.0"}""");
+            InstalledReleaseRecords.Record(nativeApp, [info]); store.Save([nativeApp]);
+            var nativeRecordPath = InstalledReleaseRecords.FilePath(Path.Combine(root, "data"), nativeApp.VersionRecordId);
+            var validRecord = File.ReadAllText(nativeRecordPath);
+            foreach (var corrupt in new[] { "{broken", "null", System.Text.RegularExpressions.Regex.Replace(validRecord, "\"Files\":\\[[^\\]]*\\]", "\"Files\":null") })
+            {
+                File.WriteAllText(nativeRecordPath, corrupt);
+                var damaged = store.Load().Single(); InstalledVersions.Reconcile(damaged);
+                Check(damaged.Installed == "3.1.1" && damaged.LocalError && damaged.VersionRecordError.Length > 0 && damaged.VersionRecord == null, "Corrupt or structurally invalid record preserves applied version and reports an issue instead of trusting stale metadata");
+                store.Save([damaged]);
+                Check(File.ReadAllText(nativeRecordPath) == corrupt, "Ordinary persistence preserves original corrupt receipt bytes");
+                var settings = new SetupWindow(client, [], edit: damaged);
+                Check(settings.Result.VersionRecordError == damaged.VersionRecordError && settings.Result.VersionRecordId == damaged.VersionRecordId, "Settings clone retains unreadable record state"); settings.Close();
+            }
+            File.Delete(nativeRecordPath);
+            var missingRecord = store.Load().Single(); InstalledVersions.Reconcile(missingRecord);
+            Check(missingRecord.LocalError && missingRecord.Installed == "3.1.1", "Missing referenced receipt reports an issue without downgrading applied version");
+            InstalledReleaseRecords.Record(missingRecord, [info]); store.Save([missingRecord]);
+            Check(missingRecord.VersionRecordError.Length == 0 && !missingRecord.LocalError && File.Exists(nativeRecordPath), "A confirmed new apply repairs unreadable record state");
+            var nullLibrary = Path.Combine(root, "null-apps.json"); File.WriteAllText(nullLibrary, "null");
+            try { new Store(nullLibrary).Load(); throw new Exception("Null library accepted"); } catch (ReleaseDock.Json.JsonException) { }
+            Check(File.ReadAllText(nullLibrary) == "null" && File.Exists(nativeRecordPath), "Null library fails closed without touching library or installation records");
+            var nullSettings = Path.Combine(root, "null-settings.json"); File.WriteAllText(nullSettings, "null");
+            try { Preferences.Load(nullSettings); throw new Exception("Null settings accepted"); } catch (ReleaseDock.Json.JsonException) { }
+            Check(File.ReadAllText(nullSettings) == "null", "Null settings fails closed without replacing settings with defaults");
+            store.Save([]); Check(!File.Exists(nativeRecordPath), "Deliberately untracking still cleans the repaired receipt");
         }
         finally { owner.Close(); Directory.Delete(root, true); }
     }

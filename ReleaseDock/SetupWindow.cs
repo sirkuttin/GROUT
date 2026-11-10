@@ -74,7 +74,7 @@ public sealed class SetupWindow : Window
         previews.Click += (_, _) => { if (firstScreen) { lookupTimer.Stop(); lookupTimer.Start(); } };
         if (edit != null)
         {
-            Result = JsonSerializer.Deserialize<TrackedApp>(JsonSerializer.Serialize(edit))!; Result.Release = edit.Release; Result.Error = edit.Error; Result.VersionRecord = edit.VersionRecord;
+            Result = JsonSerializer.Deserialize<TrackedApp>(JsonSerializer.Serialize(edit))!; Result.Release = edit.Release; Result.Error = edit.Error; Result.VersionRecord = edit.VersionRecord; Result.VersionRecordError = edit.VersionRecordError;
             ScreenTwo();
         }
         else if (preview)
@@ -363,7 +363,8 @@ public sealed class SetupWindow : Window
             try
             {
                 Result.UpdateMethod = selectedMethod; ReleaseFiles.Select(Result, asset); ValidateInstance();
-                var outcome = await UpdateRunner.Run(this, Result, asset, github, (text, progress) => { message.Text = text + (progress < 100 ? $" {progress:F0}%" : ""); cancel.IsEnabled = text.StartsWith("Downloading") || text.StartsWith("Inspecting ZIP"); }, () => { }, operation.Token, newInstall: true, prompts: updatePrompts, newWork: newWork, discovery: installDiscovery, preparedZip: preparedZip);
+                var waitingForInstaller = false;
+                var outcome = await UpdateRunner.Run(this, Result, asset, github, (text, progress) => { message.Text = text + (progress < 100 ? $" {progress:F0}%" : ""); cancel.IsEnabled = waitingForInstaller || text.StartsWith("Downloading") || text.StartsWith("Inspecting ZIP"); }, () => { }, operation.Token, newInstall: true, prompts: updatePrompts, newWork: newWork, discovery: installDiscovery, preparedZip: preparedZip, installerWaiting: waiting => { waitingForInstaller = waiting; cancel.Content = waiting ? "Stop waiting" : "Cancel download"; cancel.IsEnabled = waiting; });
                 installAttempted = Result.DownloadedPath.Length > 0;
                 if (outcome == UpdateOutcome.Deferred) { message.Text = "Nothing was installed or added. Your download is ready; you can retry."; return; }
                 if (outcome == UpdateOutcome.FilesApplied)
@@ -418,6 +419,8 @@ public sealed class SetupWindow : Window
         }
         body.Children.Add(Ui.Text(Result.UpdateMethod == "Installer" ? "Choose where the app was installed, or leave the version unknown and set it later. Installer exit does not confirm installation." : "Install or copy the downloaded files yourself, then choose their location for tracking. You can also leave the version unknown and set it later.", muted: true));
         location = Ui.Input(Result.InstallLocation); version = Ui.Input(Result.Installed); automatic = Ui.Check("Detect installed version automatically", Result.AutoReconcile); detection = Ui.Text("", muted: true);
+        System.Windows.Automation.AutomationProperties.SetName(location, "Installed folder or EXE");
+        System.Windows.Automation.AutomationProperties.SetName(version, "Installed version");
         body.Children.Add(Ui.Text("Installed folder or EXE (optional)")); body.Children.Add(location);
         var picks = new WrapPanel(); picks.Children.Add(Ui.Button("Folder…", (_, _) => PickLocation(false))); picks.Children.Add(Ui.Button("File…", (_, _) => PickLocation(true))); picks.Children.Add(Ui.Button("Check version", (_, _) => Detect())); body.Children.Add(picks); body.Children.Add(detection);
         body.Children.Add(automatic); body.Children.Add(Ui.Text("Installed version (optional)")); body.Children.Add(version);
@@ -438,7 +441,7 @@ public sealed class SetupWindow : Window
     }
     private void Detect()
     {
-        try { var found = InstalledVersions.Read(location.Text, InstalledVersions.UsesD2RLoaderManifest(Result)); version.Text = found.Version; detection.Text = $"Detected {found.Version}\nRead from {found.Source}"; automatic.IsChecked = true; }
+        try { var found = InstalledVersions.Read(location.Text, InstalledVersions.UsesD2RLoaderManifest(Result)); version.Text = found.Version; detection.Text = $"Detected {found.Version}\nRead from {found.Source}"; automatic.IsChecked = true; InstallerWait.ConfirmVersion(Result); }
         catch (Exception ex) { detection.Text = ex.Message + " Enter a version manually or choose another source."; automatic.IsChecked = false; }
     }
     private void ReadForm()

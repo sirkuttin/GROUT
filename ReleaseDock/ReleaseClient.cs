@@ -52,29 +52,30 @@ public sealed class ReleaseClient : IDisposable
         response.EnsureSuccessStatusCode();
         if (reference.Host == "d2rloader.net") { using var mod = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token)); D2RLoader.Validate(mod.RootElement); }
     }
-    public async Task<Release> Latest(string repo, bool includePrereleases = false, long nexusFileId = 0, string websiteDownloadUrl = "")
+    public async Task<Release> Latest(string repo, bool includePrereleases = false, long nexusFileId = 0, string websiteDownloadUrl = "", CancellationToken cancel = default)
     {
+        cancel.ThrowIfCancellationRequested();
         var reference = Repositories.Resolve(repo);
         if (reference.IsWebsite)
         {
             WebsiteSource.Url(websiteDownloadUrl);
-            using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancel); limit.CancelAfter(TimeSpan.FromSeconds(30));
             using var page = await Follow(new Uri(reference.WebUrl), HttpCompletionOption.ResponseHeadersRead, limit.Token, new Uri(reference.WebUrl).Host); page.EnsureSuccessStatusCode();
             if (page.Content.Headers.ContentLength > 2097152) throw new IOException("Website page is too large.");
             using var stream = await page.Content.ReadAsStreamAsync(); using var memory = new MemoryStream(); var buffer = new byte[8192]; int count;
             while ((count = await stream.ReadAsync(buffer, 0, buffer.Length, limit.Token)) > 0) { if (memory.Length + count > 2097152) throw new IOException("Website page is too large."); memory.Write(buffer, 0, count); }
             return WebsiteSource.Parse(reference.WebUrl, websiteDownloadUrl, System.Text.Encoding.UTF8.GetString(memory.ToArray()));
         }
-        if (reference.Host == "nexusmods.com") return await Nexus.Latest(reference, nexusFileId);
+        if (reference.Host == "nexusmods.com") return await Nexus.Latest(reference, nexusFileId, cancel);
         if (reference.Host == "d2rloader.net")
         {
-            using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancel); limit.CancelAfter(TimeSpan.FromSeconds(30));
             using var reply = await Get(reference, reference.ApiUrl, limit.Token); reply.EnsureSuccessStatusCode();
             using var mod = JsonDocument.Parse(await reply.Content.ReadAsStringAsync(limit.Token));
             return D2RLoader.Parse(reference, mod.RootElement, includePrereleases);
         }
-        if (reference.Host == "gitlab.com") return await LatestGitLab(reference, includePrereleases);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        if (reference.Host == "gitlab.com") return await LatestGitLab(reference, includePrereleases, cancel);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel); timeout.CancelAfter(TimeSpan.FromSeconds(30));
         var endpoint = includePrereleases ? reference.Host == "codeberg.org" ? "/releases?limit=100" : "/releases?per_page=100" : "/releases/latest";
         using var response = await Get(reference, reference.ApiUrl + endpoint, timeout.Token);
         if (response.StatusCode == HttpStatusCode.NotFound) throw new InvalidOperationException(includePrereleases ? "Project unavailable. Check the URL and public access." : "No stable release found. Try including preview releases, or check the project link.");
@@ -92,9 +93,9 @@ public sealed class ReleaseClient : IDisposable
     private static string Text(JsonElement root, string name) => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
     private static bool Flag(JsonElement root, string name) => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
     private static DateTimeOffset Date(JsonElement root, string name) => DateTimeOffset.TryParse(Text(root, name), out var date) ? date : DateTimeOffset.MinValue;
-    private async Task<Release> LatestGitLab(RepositoryRef reference, bool includePrereleases)
+    private async Task<Release> LatestGitLab(RepositoryRef reference, bool includePrereleases, CancellationToken cancel)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel); timeout.CancelAfter(TimeSpan.FromSeconds(30));
         using var response = await Get(reference, reference.ApiUrl + "/releases?per_page=100&order_by=released_at&sort=desc", timeout.Token);
         if (response.StatusCode == HttpStatusCode.NotFound) throw new InvalidOperationException("GitLab project/releases unavailable. Check the link and public access.");
         response.EnsureSuccessStatusCode();

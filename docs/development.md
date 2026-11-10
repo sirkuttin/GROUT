@@ -42,6 +42,8 @@ The suite uses isolated libraries, temporary files and mocked HTTP. It exercises
 
 Real third-party installer/uninstaller execution, Windows notification delivery, startup behavior and live accessibility/multiple-DPI behavior still need manual testing.
 
+The accessibility suite exercises the library's Left/Right navigation handler, item/state names, option labels and window bounds/layout using simulated 100%, 125%, 150% and 200% scale inputs against a 1920×1040 work area. It does not send real keyboard input, operate a screen reader, change Windows scaling or establish behavior across monitors. See [Windows validation](windows-validation.md) for the remaining manual checks.
+
 ## Diagnostics
 
 These commands write reports without changing the tracked-app library. Use absolute report paths when invoking them from another working directory.
@@ -72,6 +74,8 @@ GROUT.exe --preview-portable PNG_PATH
 ```
 
 Documentation [screenshots](images/) come from these previews. Build the current source first, then render the library, add-app, app-settings, portable and missing-app states. Preview commands use neutral sample paths and render the current app UI without loading your library. Inspect every PNG before replacing a public screenshot.
+
+Main-window previews (`--preview`, `--preview-mods`, `--preview-collapsed`, `--preview-missing`, `--preview-nexus`) render without showing a desktop window. The drag-cue preview and setup/menu previews still use native windows. Rendering is sample-only and does not establish physical-input or accessibility behavior.
 
 ## Local files and notices
 

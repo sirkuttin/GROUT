@@ -49,6 +49,7 @@ public static class LibraryTree
             if (!visited.Add(n.Id)) throw new IOException("The library contains a parent cycle.");
             var children = Ordered(nodes.Where(c => c.ParentId == n.Id)).ToList();
             n.TreeDepth = depth; n.TreeOrder = order++; n.HasChildren = children.Count > 0;
+            n.TreeFilterExpanded = n.HasChildren && (updatesOnly || query.Length > 0);
             n.TreeVisible = parentVisible && Subtree(n, new HashSet<string>());
             foreach (var child in children) Visit(child, depth + 1, n.TreeVisible && (n.Expanded || updatesOnly || query.Length > 0));
             n.BranchItemCount = (n.IsGroup ? 0 : 1) + children.Sum(c => c.BranchItemCount);
@@ -83,7 +84,9 @@ public static class LibraryTree
     {
         var nodes = entries.ToList(); var window = Ui.Window(node.IsGroup ? "Organize group" : "Organize item", 650, 620); window.Owner = owner;
         var panel = Ui.Panel(window); panel.Children.Add(Ui.Text(node.IsGroup ? "Group name" : "Name", 18)); var name = Ui.Input(node.AppName); panel.Children.Add(name);
+        System.Windows.Automation.AutomationProperties.SetName(name, node.IsGroup ? "Group name" : "Name");
         panel.Children.Add(Ui.Text("Parent", 18)); var parent = new ComboBox { Padding = new Thickness(8), Margin = new Thickness(0,0,0,12) }; LibraryOrganization.ReadableCombo(parent);
+        System.Windows.Automation.AutomationProperties.SetName(parent, "Parent");
         parent.Items.Add(new ComboBoxItem { Content = "Library (top level)", Tag = "" });
         foreach (var candidate in nodes.Where(n => CanParent(node, n, nodes)).OrderBy(n => n.AppName))
         {
@@ -94,6 +97,7 @@ public static class LibraryTree
         parent.SelectedItem = parent.Items.Cast<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, node.ParentId)) ?? parent.Items[0]; panel.Children.Add(parent);
         panel.Children.Add(Ui.Text("Changing the parent organizes this item. Installed files stay where they are.", muted: true));
         panel.Children.Add(Ui.Text("Default install folder for new children (optional)", 18)); var folder = Ui.Input(node.DefaultChildFolder); panel.Children.Add(folder);
+        System.Windows.Automation.AutomationProperties.SetName(folder, "Default install folder for new children");
         panel.Children.Add(Ui.Button("Browse…", (_, _) => { var pick = new FolderPicker(); if (pick.ShowDialog(window) == true) folder.Text = pick.FolderName; }));
         panel.Children.Add(Ui.Text("This pre-fills new child installs only. Existing child folders are not changed. Tree names are never added to a physical path.", muted: true));
         var error = Ui.Text(""); panel.Children.Add(error); var actions = new WrapPanel(); panel.Children.Add(actions);

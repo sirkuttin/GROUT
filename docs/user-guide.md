@@ -4,7 +4,9 @@
 
 ## Add an app
 
-Choose **Add App** and paste a [supported repository or release link](supported-sources.md). GROUT checks the project and shows its latest release. Enable **Include preview releases** for preview-only projects.
+In the library, use **Up/Down** to select items. **Right** expands a branch, then enters its first visible child; **Left** collapses a branch or selects its parent. **Tab** moves between controls. Search and Updates only are temporarily hidden; the library shows your full tree.
+
+Choose **+ Add…**, then **Add app…** or **Add mod…**, and paste a [supported repository or release link](supported-sources.md). GROUT checks the project and shows its latest release. Enable **Include preview releases** for preview-only projects. **New group…** creates an organizer without installing anything.
 
 | Choice | What happens next |
 | --- | --- |
@@ -94,7 +96,7 @@ GROUT checks saved locations even for manually tracked apps. Missing locations s
 
 In **Settings**, choose **Manual only**, **Every hour**, **Every 6 hours**, or **Every day** for tracked-app release checks. Daily is the default. Due checks run on launch and after wake. Source-specific rate-limit/access pauses survive restarts.
 
-Closing the window leaves GROUT in the tray. Double-click the icon to reopen it, or right-click for **Open**, **Check now**, **Settings** and **Exit**. Exit stops checking.
+In Settings, **When I close GROUT** lets you choose **Keep running in the tray** (the default) or **Exit GROUT**. Keeping it in the tray allows scheduled checks to continue; exiting stops them. Active operations and open dialogs must be finished before exiting. Double-click the tray icon to reopen GROUT, or right-click for **Open**, **Check now**, **Settings** and **Exit**.
 
 Notifications announce new app/release tags once. **Quiet mode** suppresses them without creating a later backlog. Windows notification and Do Not Disturb settings can also suppress display.
 
@@ -156,7 +158,7 @@ The selected app shows its full repository URL beneath its name; click it to ope
 
 Suggested app names remain automatic and refresh when the install location changes. Typing a custom name makes it an explicit override. **Use detected name** clears the override and returns to the current app's name. A shared parent folder is not used to borrow an unrelated program's identity. Overrides saved by older versions are preserved until you reset them, so intentional custom names are not lost.
 
-App counts and update counts appear below **Check now**; during a check they temporarily show **Checking for updates…**. A failed check is marked in amber on the affected app entry. **Open app folder** is disabled for a missing installation. **Show downloaded file** is only available for **Download only** mode, where you install the downloaded file yourself.
+App counts and update counts appear below **Check now**; during a check they temporarily show **Checking for updates…** and the button becomes **Cancel checks**. Cancelling stops the active request and remaining checks, keeps completed results, and leaves unchecked items unchanged. It does not count as a fully successful check. A failed check is marked in amber on the affected app entry. **Open app folder** is disabled for a missing installation. **Show downloaded file** is only available for **Download only** mode, where you install the downloaded file yourself.
 
 ## Nexus Mods (private test builds only)
 
@@ -176,11 +178,13 @@ The choice is saved for future updates. Change it under **App settings → ZIP c
 
 Use **Add → New group** to create an organizer such as D2R. A tracked item can also have children: Reimagined remains updatable while Auto Deposit and Remote Stash sit below it. Existing items remain where they were until you organize them; GROUT does not infer parent relationships from source names.
 
-Right-click a row and choose **Name, parent and child folder…** to change its name, parent or optional **Default install folder for new children**. Names never construct physical paths. Reparenting and renaming do not move files. Removing a group or stopping tracking a parent promotes its children one level, leaving installed files alone. A physical parent uninstall is blocked if it would also remove other tracked installations.
+Click anywhere on a group header to expand or collapse it; a group does not open a detail page. Right-click a row or choose its **⋯** button for the same actions, including **Name, parent and child folder…** to change its name, parent or optional **Default install folder for new children**. Tracked apps with children still have their app details and a separate expand arrow. Names never construct physical paths. Reparenting and renaming do not move files. Removing a group or stopping tracking a parent promotes its children one level, leaving installed files alone. A physical parent uninstall is blocked if it would also remove other tracked installations.
+
+Overflow buttons appear on row hover or keyboard focus and remain visible while their menu is open. The first click outside an open menu dismisses it without activating the underlying control. Drag the divider beside the library to resize the sidebar; its width is remembered. A focused divider can also be adjusted with arrow keys. App titles use the top line of each row, with status beside the secondary information below.
 
 Use the row menu to add an app or mod under the selected parent. The Add screens show **Add to: D2R › Reimagined** separately from the physical **Install folder**. A parent default pre-fills new installations only; tracking an existing app still requires its actual location. New mod ZIPs use the exact selected folder; ordinary application ZIP installs still create an app-named child folder.
 
-Search and **Updates only** keep the tree context visible, including the parents of items that need updates. D2RLoader catalog browsing is temporarily hidden; direct mod URLs and existing tracked mods remain supported. The same source can appear in distinct physical destinations, with independent versions and extraction mappings. **Item type** distinguishes app/portable behavior from direct mod-folder extraction; grouping does not change that behavior.
+Search, **Updates only** and D2RLoader catalog browsing are temporarily hidden. Direct mod URLs and existing tracked mods remain supported. The same source can appear in distinct physical destinations, with independent versions and extraction mappings. **Item type** distinguishes app/portable behavior from direct mod-folder extraction; grouping does not change that behavior.
 
 When a saved download cannot be matched to a new release, select **Choose download…**. GROUT explains which saved file is missing and remembers the compatible replacement. Then select **Update** to install. Added terminal revision markers such as `.R17` are recognized within the same filename family; multiple matches or changed editions still require a choice.
 

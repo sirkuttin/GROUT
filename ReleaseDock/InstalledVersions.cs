@@ -109,6 +109,7 @@ public static class InstalledVersions
         }
         if (!app.AutoReconcile) app.LocalError = false;
         if (!app.AutoReconcile) { app.LocalStatus = app.InstalledProvenance.Length > 0 ? app.InstalledProvenance : "Manual version tracking"; return; }
+        if (app.VersionRecordError.Length > 0) { app.LocalError = true; app.LocalStatus = app.VersionRecordError; return; }
         if (app.VersionRecord is { } record)
         {
             if (!InstalledReleaseRecords.ValidLocation(app, record)) app.VersionRecord = null;

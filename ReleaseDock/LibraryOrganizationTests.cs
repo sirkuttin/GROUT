@@ -34,10 +34,17 @@ public static class LibraryOrganizationTests
         branch.Expanded = true; LibraryTree.Prepare(summaryNodes, false, "");
         Check(branch.LibraryStatus.Length == 0, "Expanded organizers hide the branch summary");
         branch.Expanded = false;
+        LibraryTree.Prepare(summaryNodes, false, "test/current");
+        Check(current.TreeVisible && !branch.Expanded && branch.TreeGlyph == "▾" && !branch.ShowBranchSummary && !branch.CanToggleTree, "Search reveals a branch with consistent expanded presentation without changing saved collapse state");
+        available.Latest = "2.0"; available.Release = new("2.0", "", "", []);
+        LibraryTree.Prepare(summaryNodes, true, "");
+        Check(branch.TreeVisible && available.TreeVisible && branch.TreeFilterExpanded && branch.TreeGlyph == "▾" && !branch.ShowBranchSummary && !branch.CanToggleTree, "Updates filter presents retained ancestors as expanded without a redundant summary");
+        LibraryTree.Prepare(summaryNodes, false, "");
+        Check(!current.TreeVisible && branch.TreeGlyph == "▸" && branch.ShowBranchSummary && branch.CanToggleTree && !branch.Expanded, "Clearing filters restores the saved collapsed presentation and interactive toggle");
         installedParent.Latest = available.Latest = "2.0"; installedParent.Release = available.Release = new("2.0", "", "", []); LibraryTree.Prepare(summaryNodes, false, "");
         Check(branch.LibraryStatus == "2 updates", "Branch count includes a tracked parent's own update and its descendant update once each");
         current.Error = "Update check failed"; LibraryTree.Prepare(summaryNodes, true, "nothing matches");
-        Check(branch.LibraryStatus == "2 updates · 1 issue" && branch.LibraryStatusColor == "#F0D495", "Hidden errors remain visible in summaries independently of search/update filtering");
+        Check(branch.BranchUpdateCount == 2 && branch.BranchIssueCount == 1 && !branch.ShowBranchSummary, "Filtering preserves underlying branch counts while hiding summaries for visually expanded branches");
         installedParent.Latest = available.Latest = "1.0"; installedParent.Release = available.Release = new("1.0", "", "", []); LibraryTree.Prepare(summaryNodes, false, "");
         Check(branch.LibraryStatus == "1 issue", "Failed checks are not incorrectly summarized as all up to date");
         var old = Json.JsonSerializer.Deserialize<TrackedApp>("""{"Repo":"https://d2rloader.net/hub/plugins/remote-stash","Installed":"2.3.4"}""")!;

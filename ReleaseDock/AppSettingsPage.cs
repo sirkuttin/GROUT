@@ -149,7 +149,9 @@ public sealed class AppSettingsPage
         app.CustomName = customName ? appName.Text.Trim() : "";
         if (!customName) app.InvalidateSuggestedName();
         if (!validate) { CaptureDraft(); return; }
+        var previousLocation = app.InstallLocation;
         ReadLocation(); draft.Apply(app, Method);
+        if (!string.Equals(previousLocation, app.InstallLocation, StringComparison.OrdinalIgnoreCase) && app.VersionRecordError.Length > 0) { app.VersionRecord = null; app.VersionRecordError = ""; }
         if (Method == "Zip") app.ZipSubfolder = FileUpdates.NormalizeZipSubfolder(app.ZipSubfolder);
         app.AutoReconcile = automatic.IsChecked == true; app.IncludePrereleases = previews.IsChecked == true;
         if (app.Installed != manual.Text.Trim()) app.InstalledProvenance = "Manually entered installed version";
@@ -160,7 +162,7 @@ public sealed class AppSettingsPage
         InstalledVersions.Reconcile(app);
         if (sourceChanged)
         {
-            app.VersionRecord = null; app.PendingInstallerRelease = "";
+            app.VersionRecord = null; app.VersionRecordError = ""; app.PendingInstallerRelease = "";
             app.Repo = source; app.Release = null; app.Latest = ""; app.CheckedAt = null; app.Error = "";
             app.AssetName = ""; app.NexusFileId = 0; app.D2RManagedFolder = ""; app.LastNotifiedTag = ""; app.DownloadedPath = ""; app.DownloadedTag = "";
             app.UpdateState = "Repository changed — checking the new source";

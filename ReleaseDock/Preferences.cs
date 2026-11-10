@@ -22,6 +22,8 @@ public sealed class Preferences
     public DateTimeOffset? SelfUpdateLastAttempt { get; set; }
     public string SelfUpdateNotifiedTag { get; set; } = "";
     public bool TrayExplained { get; set; }
+    public bool CloseToTray { get; set; } = true;
+    public double SidebarWidth { get; set; } = 330;
     public DateTimeOffset? LastAttempt { get; set; }
     public DateTimeOffset? LastSuccess { get; set; }
     public DateTimeOffset? RetryAfter { get; set; }
@@ -31,8 +33,10 @@ public sealed class Preferences
     public static Preferences Load(string? path = null)
     {
         path ??= Path.Combine(AppPaths.Data, "settings.json");
-        var result = File.Exists(path) ? JsonSerializer.Deserialize<Preferences>(File.ReadAllText(path)) ?? new() : new();
+        var result = File.Exists(path) ? JsonSerializer.Deserialize<Preferences>(File.ReadAllText(path)) ?? throw new JsonException("The saved settings must contain a settings object, not null.") : new();
         if (result.CheckHours is not (0 or 1 or 6 or 24)) result.CheckHours = 24;
+        if (result.SourceBackoffs == null) throw new JsonException("Saved source retry settings must be an object, not null.");
+        if (double.IsNaN(result.SidebarWidth) || double.IsInfinity(result.SidebarWidth) || result.SidebarWidth < 220 || result.SidebarWidth > 800) result.SidebarWidth = 330;
         return result;
     }
     public void Save(string? path = null)

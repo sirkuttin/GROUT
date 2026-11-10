@@ -105,9 +105,9 @@ public sealed class NexusMods : IDisposable
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)); using var mod = await Get(source.ApiUrl + ".json", timeout.Token);
         if (Text(mod.RootElement, "name").Length == 0) throw new IOException("Nexus did not return a mod page.");
     }
-    public async Task<Release> Latest(RepositoryRef source, long selectedId = 0)
+    public async Task<Release> Latest(RepositoryRef source, long selectedId = 0, CancellationToken cancel = default)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel); timeout.CancelAfter(TimeSpan.FromSeconds(30));
         using var mod = await Get(source.ApiUrl + ".json", timeout.Token);
         using var files = await Get(source.ApiUrl + "/files.json", timeout.Token);
         return Parse(source, mod.RootElement, files.RootElement, selectedId);

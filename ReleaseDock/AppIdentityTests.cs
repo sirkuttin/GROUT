@@ -100,9 +100,10 @@ internal static class AppIdentityTests
                 var list = (System.Windows.Controls.ListBox)preview.FindName("Library");
                 var visibleApps = (System.Collections.ObjectModel.ObservableCollection<TrackedApp>)list.ItemsSource;
                 visibleApps.Add(pending); list.SelectedItem = pending;
+                var previousFooter = ((System.Windows.Controls.TextBlock)preview.FindName("StatusLabel")).Text;
                 preview.CheckPendingUninstalls();
                 Check(!visibleApps.Contains(pending) && list.Items.Count == 1, "Successful uninstall removes actual visible library item");
-                Check(((System.Windows.Controls.TextBlock)preview.FindName("StatusLabel")).Text.Contains("uninstalled and removed"), "Visible completion confirms both uninstall and library removal");
+                Check(((System.Windows.Controls.TextBlock)preview.FindName("StatusLabel")).Text == previousFooter, "Visible removal needs no duplicate routine success footer");
             }
             finally { preview.Close(); }
         }

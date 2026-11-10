@@ -2,32 +2,42 @@
  <Grid Margin="16">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <DockPanel Margin="0,0,0,16">
-   <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="16,0,0,0"><WrapPanel><Button x:Name="CheckButton" Content="Check now" Click="Check_Click"/><Button x:Name="AddAppButton" Content="+ Add App" Click="Add_Click" Background="#267E70"/></WrapPanel><TextBlock x:Name="CountLabel" Text="Track releases. Update on your terms." Foreground="#A4B4C9" Margin="0,8,0,0"/></StackPanel>
-   <StackPanel><TextBlock x:Name="LibraryHeading" Text="Library" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Organize your apps, mods and updates" Foreground="#A4B4C9" Margin="0,6,0,0"/></StackPanel>
+   <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="16,0,0,0"><WrapPanel HorizontalAlignment="Right"><Button x:Name="CheckButton" Content="Check now" Click="Check_Click"/><Button x:Name="AddAppButton" Content="+ Add App" Click="Add_Click" Background="#267E70" Margin="0"/></WrapPanel><TextBlock x:Name="CountLabel" Text="Track releases. Update on your terms." TextAlignment="Right" Foreground="#A4B4C9" Margin="0,8,0,0"/></StackPanel>
+   <StackPanel><TextBlock x:Name="LibraryHeading" Text="G.R.O.U.T." FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Filling the gaps in app updates." Foreground="#A4B4C9" Margin="0,6,0,0"/></StackPanel>
   </DockPanel>
-  <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-   <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,12">
+  <Grid x:Name="LibraryLayout" Grid.Row="1" SizeChanged="LibraryLayout_SizeChanged"><Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="330" MinWidth="220"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*" MinWidth="340"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <StackPanel x:Name="LibraryFilterRow" Grid.ColumnSpan="3" Margin="0,0,0,12" Visibility="Collapsed">
     <WrapPanel x:Name="LibraryFilters" Margin="0"><TextBlock x:Name="SearchLabel" Text="Search library" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="LibrarySearch" Width="200" TextChanged="Search_Changed" AutomationProperties.Name="Search library"/><CheckBox x:Name="UpdatesOnlyFilter" Content="Updates only" Foreground="#F1F5FC" VerticalAlignment="Center" Margin="16,0,0,0" Click="UpdatesOnly_Click"/></WrapPanel>
    </StackPanel>
 
-   <ListBox Grid.Row="1" x:Name="Library" Background="#101C2D" BorderThickness="0" Foreground="White" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Selected" ContextMenuOpening="TreeMenu_Opening" PreviewMouseRightButtonDown="TreeRightClick" AllowDrop="True" PreviewMouseLeftButtonDown="TreeMouseDown" PreviewMouseMove="TreeMouseMove" DragOver="TreeDragOver" Drop="TreeDrop" DragLeave="TreeDragLeave">
+   <ListBox Grid.Row="1" x:Name="Library" AutomationProperties.Name="Library" Background="#101C2D" BorderThickness="0" Foreground="White" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Selected" PreviewKeyDown="TreeKeyDown" ContextMenuOpening="TreeMenu_Opening" PreviewMouseRightButtonDown="TreeRightClick" AllowDrop="True" PreviewMouseLeftButtonDown="TreeMouseDown" PreviewMouseLeftButtonUp="TreeMouseUp" PreviewMouseMove="TreeMouseMove" DragOver="TreeDragOver" Drop="TreeDrop" DragLeave="TreeDragLeave">
+    <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding LibraryAutomationName}"/><Setter Property="AutomationProperties.HelpText" Value="{Binding TreeToggleHint}"/></Style></ListBox.ItemContainerStyle>
     <ListBox.ContextMenu><ContextMenu/></ListBox.ContextMenu><ListBox.ItemTemplate><DataTemplate>
      <Grid Margin="{Binding TreeMargin}">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <Button Content="{Binding TreeGlyph}" Tag="{Binding}" IsEnabled="{Binding HasChildren}" Click="ExpandNode_Click" Width="18" Padding="0" Background="Transparent" Margin="0,0,4,0" VerticalAlignment="Top"/>
-      <StackPanel Grid.Column="1" Margin="0,0,12,0">
-       <TextBlock Text="{Binding AppName}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding AppName}"/>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Button Content="{Binding TreeGlyph}" Tag="{Binding}" IsTabStop="False" IsEnabled="{Binding CanToggleTree}" ToolTip="{Binding TreeToggleHint}" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="{Binding TreeToggleName}" AutomationProperties.HelpText="{Binding TreeToggleHint}" Click="ExpandNode_Click" Width="18" Padding="0" Background="Transparent" Margin="0,0,4,0" VerticalAlignment="Top"/>
+      <TextBlock Grid.Column="1" Text="{Binding AppName}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding AppName}"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Grid.ColumnSpan" Value="3"/><Style.Triggers><DataTrigger Binding="{Binding IsGroup}" Value="True"><Setter Property="Grid.ColumnSpan" Value="1"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+      <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,12,0">
        <TextBlock Text="{Binding InstallationSummary}" ToolTip="{Binding InstallationSummary}" Foreground="#76DCC6" FontSize="12" TextTrimming="CharacterEllipsis"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock><TextBlock Text="{Binding ProjectLabel}" Foreground="#A4B4C9" FontSize="12" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding ProjectLabel}"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
       </StackPanel>
-      <TextBlock Grid.Column="2" Text="{Binding LibraryStatus}" ToolTip="{Binding LibraryStatusHint}" Foreground="{Binding LibraryStatusColor}" MaxWidth="110" TextAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" TextWrapping="Wrap"/>
+      <TextBlock Grid.Column="2" Text="{Binding LibraryStatus}" ToolTip="{Binding LibraryStatusHint}" Foreground="{Binding LibraryStatusColor}" MaxWidth="110" TextAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Grid.Row" Value="1"/><Style.Triggers><DataTrigger Binding="{Binding IsGroup}" Value="True"><Setter Property="Grid.Row" Value="0"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+      <Button Grid.Column="3" Content="⋯" Tag="{Binding}" AutomationProperties.Name="{Binding OptionsName}" ToolTip="{Binding OptionsName}" Click="TreeOverflow_Click" Width="26" Height="28" Padding="0" Margin="6,0,0,0" Background="Transparent" VerticalAlignment="Center">
+       <Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Grid.Row" Value="1"/><Setter Property="Opacity" Value="0"/><Setter Property="IsHitTestVisible" Value="False"/><Style.Triggers>
+        <DataTrigger Binding="{Binding IsGroup}" Value="True"><Setter Property="Grid.Row" Value="0"/></DataTrigger>
+        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Opacity" Value="1"/><Setter Property="IsHitTestVisible" Value="True"/></DataTrigger>
+        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Opacity" Value="1"/><Setter Property="IsHitTestVisible" Value="True"/></DataTrigger>
+        <DataTrigger Binding="{Binding ContextMenu.IsOpen, RelativeSource={RelativeSource Self}}" Value="True"><Setter Property="Opacity" Value="1"/><Setter Property="IsHitTestVisible" Value="True"/></DataTrigger>
+       </Style.Triggers></Style></Button.Style>
+      </Button>
      </Grid>
     </DataTemplate></ListBox.ItemTemplate>
    </ListBox>
+   <GridSplitter x:Name="SidebarSplitter" Grid.Row="1" Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#17283A" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" ShowsPreview="True" DragCompleted="SidebarResize_Completed" KeyUp="SidebarResize_KeyUp" AutomationProperties.Name="Resize library sidebar" ToolTip="Drag to resize the sidebar. Arrow keys resize when focused."/>
    <Border x:Name="DetailsPanel" Grid.Row="1" Grid.Column="2" Background="#142033" CornerRadius="12" Padding="24">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <TextBlock x:Name="AppTitle" Text="Bring your apps aboard." FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap"/>
      <TextBlock Foreground="#A4B4C9" Margin="0,6,0,0" TextWrapping="Wrap"><Hyperlink x:Name="RepositoryLink" Foreground="#76DCC6" Click="Repository_Click"><Run x:Name="SourceLabel"/></Hyperlink></TextBlock><TextBlock x:Name="TargetContextLabel" Foreground="#76DCC6" TextWrapping="Wrap" Margin="0,10,0,0"/><TextBlock x:Name="VersionLabel" Text="Choose Add App to track an existing installation or install something new from a supported release host." Foreground="#A4B4C9" Margin="0,12,0,16" TextWrapping="Wrap"/>
-     <StackPanel x:Name="GroupDetails" Visibility="Collapsed"><TextBlock x:Name="GroupDescription" Foreground="#A4B4C9" TextWrapping="Wrap" Margin="0,12,0,16"/><WrapPanel><Button Content="Add child…" Click="AddChild_Click"/><Button Content="Edit group…" Click="Organize_Click"/><Button Content="Remove group" Click="Remove_Click"/></WrapPanel></StackPanel>
      <StackPanel x:Name="Details" Visibility="Collapsed">
       <TextBlock x:Name="StateLabel" Foreground="#76DCC6" FontSize="18" Margin="0,0,0,16"/>
       <Border x:Name="MissingBanner" Visibility="Collapsed" Background="#352D20" BorderBrush="#F0D495" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,18"><StackPanel><TextBlock Text="App not found" Foreground="#F0D495" FontSize="22" FontWeight="SemiBold"/><TextBlock x:Name="MissingMessage" TextWrapping="Wrap" Margin="0,8,0,12"/><WrapPanel><Button x:Name="FindInstallationButton" Content="Find installation…" Click="FindInstallation_Click" Background="#267E70"/><Button Content="Stop tracking" Click="Remove_Click"/></WrapPanel></StackPanel></Border><WrapPanel><Button x:Name="UpdateButton" Content="Update" Background="#267E70" Click="Update_Click" ToolTipService.ShowOnDisabled="True"/><Button Content="Release notes ↗" Click="Release_Click"/><Button x:Name="AppSettingsButton" Content="Settings" Click="AppSettings_Click"/></WrapPanel>
@@ -39,6 +49,7 @@
        <StackPanel Margin="0,12,0,0">
         <TextBlock x:Name="LocalLabel" Foreground="#A4B4C9" TextWrapping="Wrap" Margin="0,0,0,12"/>
         <WrapPanel><Button Content="Recheck version" Click="Recheck_Click"/><Button Content="Mark latest as installed" Click="Mark_Click"/></WrapPanel>
+        <TextBlock x:Name="VersionCheckError" Foreground="#F0D495" TextWrapping="Wrap" Margin="0,8,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
         <TextBlock Text="Or enter the installed release tag manually:" Foreground="#A4B4C9" Margin="0,12,0,8"/>
         <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="InstalledInput" AutomationProperties.Name="Installed version"/><Button Grid.Column="1" Content="Save" Click="SaveVersion_Click" Margin="8,0,0,0"/></Grid>
         <TextBlock Text="Manual marking pauses automatic detection. Resume it in App settings." Foreground="#A4B4C9" Margin="0,10,0,0" TextWrapping="Wrap"/>
@@ -58,12 +69,13 @@
     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <TextBlock x:Name="StatusLabel" Foreground="#A4B4C9" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
     <StackPanel Grid.Column="1" Orientation="Horizontal">
-     <TextBlock x:Name="SelfUpdateLabel" VerticalAlignment="Center" Foreground="#A4B4C9" Margin="0,0,6,0"/>
+     <TextBlock x:Name="SelfUpdateLabel" VerticalAlignment="Center" Foreground="#A4B4C9" MaxWidth="240" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,6,0"/>
      <Button x:Name="CheckSelfButton" Content="Check GROUT updates" Click="CheckSelf_Click" Margin="0,0,4,0"/>
      <Button x:Name="InstallSelfButton" Content="Update GROUT" Click="InstallSelf_Click" Visibility="Collapsed" Background="#267E70" Margin="0,0,4,0"/>
      <Button x:Name="SettingsButton" Content="Settings" Click="Settings_Click" Margin="0"/>
     </StackPanel>
    </Grid>
   </StackPanel>
+  <Border x:Name="MenuClickShield" Grid.RowSpan="3" Panel.ZIndex="1000" Background="Transparent" Visibility="Collapsed" Focusable="False"/>
  </Grid>
 </Window>

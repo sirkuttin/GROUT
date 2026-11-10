@@ -30,12 +30,16 @@ public static class Ui
             if (handle == IntPtr.Zero) return;
             var area = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
             var dpi = VisualTreeHelper.GetDpi(window);
-            window.MaxWidth = Math.Max(280, area.Width / dpi.DpiScaleX - 24); window.MaxHeight = Math.Max(280, area.Height / dpi.DpiScaleY - 24);
-            window.MinWidth = Math.Min(window.MinWidth, window.MaxWidth); window.MinHeight = Math.Min(window.MinHeight, window.MaxHeight);
-            if (!double.IsNaN(window.Width)) window.Width = Math.Min(window.Width, window.MaxWidth);
-            if (!double.IsNaN(window.Height)) window.Height = Math.Min(window.Height, window.MaxHeight);
+            FitToWorkArea(window, new Size(area.Width, area.Height), dpi.DpiScaleX, dpi.DpiScaleY);
         }
         window.SourceInitialized += (_, _) => Fit(); window.DpiChanged += (_, _) => Fit();
+    }
+    internal static void FitToWorkArea(Window window, Size pixels, double scaleX, double scaleY)
+    {
+        window.MaxWidth = Math.Max(280, pixels.Width / scaleX - 24); window.MaxHeight = Math.Max(280, pixels.Height / scaleY - 24);
+        window.MinWidth = Math.Min(window.MinWidth, window.MaxWidth); window.MinHeight = Math.Min(window.MinHeight, window.MaxHeight);
+        if (!double.IsNaN(window.Width)) window.Width = Math.Min(window.Width, window.MaxWidth);
+        if (!double.IsNaN(window.Height)) window.Height = Math.Min(window.Height, window.MaxHeight);
     }
     public static TextBlock Text(string value, double size = 14, bool muted = false) => new() { Text = value, FontSize = size, Foreground = muted ? Muted : Brushes.White, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
     public static Button Button(string label, RoutedEventHandler clicked) { var b = new Button { Content = label, HorizontalAlignment = HorizontalAlignment.Left, IsCancel = label == "Cancel", IsDefault = label is "Next →" or "Save settings" or "Add App" or "Add to library" }; b.Click += clicked; return b; }
@@ -43,7 +47,7 @@ public static class Ui
     public static ComboBox Choice(IEnumerable<string> options, int index = 0)
     {
         var combo = new ComboBox { Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(8), Foreground = Brushes.Black };
-        foreach (var label in options) combo.Items.Add(new ComboBoxItem { Content = new TextBlock { Text = label, Foreground = Brushes.Black }, Foreground = Brushes.Black });
+        foreach (var label in options) { var item = new ComboBoxItem { Content = new TextBlock { Text = label, Foreground = Brushes.Black }, Foreground = Brushes.Black }; System.Windows.Automation.AutomationProperties.SetName(item, label); combo.Items.Add(item); }
         combo.SelectedIndex = index;
         return combo;
     }
