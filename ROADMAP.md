@@ -16,16 +16,16 @@ The next milestone makes core operations safe to leave, retry and recover from.
 
 | Order | Outcome | Backlog |
 | --- | --- | --- |
-| Release preparation | Preserve corruption evidence, version drafts and truthful filtered-tree states; keep version feedback local. Implemented and tested, not yet published. | GROUT-001–004 |
-| 1 | Cancel release checks without inventing failures or successful completion. Implemented and tested, not yet published. | GROUT-005 |
-| 2 | Stop waiting for an external installer without killing it or claiming success. Implemented and tested, not yet published. | GROUT-006 |
-| 3 | Recover from damaged configuration with clear file details and a safe retry route. Implemented and tested, not yet published. | GROUT-007 |
-| 4 | Finish placing app/action feedback near its owner; keep shared save failures global. Implemented and tested, not yet published. | GROUT-008 |
+| Release preparation | Preserve corruption evidence, version drafts and truthful filtered-tree states; keep version feedback local. Shipped in 0.11.0. | GROUT-001–004 |
+| 1 | Cancel release checks without inventing failures or successful completion. Shipped in 0.11.0. | GROUT-005 |
+| 2 | Stop waiting for an external installer without killing it or claiming success. Shipped in 0.11.0. | GROUT-006 |
+| 3 | Recover from damaged configuration with clear file details and a safe retry route. Shipped in 0.11.0. | GROUT-007 |
+| 4 | Finish placing app/action feedback near its owner; keep shared save failures global. Shipped in 0.11.0. | GROUT-008 |
 | Throughout | Validate keyboard access, understandable item/state names and scaling; document what was actually tested. | GROUT-009 |
 
 Done when each item's acceptance criteria pass, interrupted/failed operations preserve truthful state, and remaining Windows validation limits are explicit. This roadmap does not authorize publishing a release.
 
-Release candidate 0.11.0 includes implemented Now work and owner-requested sidebar/menu/close behavior polish (GROUT-019–022). Search and Updates only are hidden. The owner chose to defer remaining live Windows validation as an explicit limitation; computer control stays off. Publication is still pending.
+[Release 0.11.0](https://github.com/sirkuttin/GROUT/releases/tag/v0.11.0) includes implemented Now work and owner-requested sidebar/menu/close behavior polish (GROUT-019–022). Search and Updates only are hidden. The owner chose to defer remaining live Windows validation as an explicit limitation; computer control stays off. Published 2026-11-09.
 
 ## Next: prove and simplify custom installation
 

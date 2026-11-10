@@ -418,3 +418,7 @@
 - Owner chose2A: remaining real Windows keyboard/screen-reader/DPI cases stay documented, not claimed passed, while release preparation proceeds. Marked remaining GROUT-009 validation Deferred; computer control remains off. No open decisions remain.
 - Prepared0.11.0 version and release notes, current README/user/troubleshooting/development docs and roadmap/backlog status. Main library/missing-app screenshots now render headlessly without showing desktop windows; inspected both and corrected preview-margin cropping before final assets.
 - Local release script builds/tests the single EXE and generates checksums, test report and license notices. Nothing pushed or published. Publication still needs explicit instruction. Test build: outputs/releases/0.11.0/GROUT.exe.
+
+## 2026-11-09 — 0.11.0 published
+- Explicit owner publication request completed with scripts/release.csx --publish. Fresh single-EXE build, full packaged regression suite, tag/source matching and uploaded asset digest/size verification passed.
+- Published latest: https://github.com/sirkuttin/GROUT/releases/tag/v0.11.0. EXE774656bytes. Updated included backlog work to Shipped; deferred live Windows validation remains explicit. Roadmap/backlog status update is documentation-only and does not create another release.
