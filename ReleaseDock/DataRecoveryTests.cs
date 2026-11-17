@@ -22,6 +22,20 @@ internal static class DataRecoveryTests
         var root = Path.Combine(Path.GetTempPath(), "GROUT-data-recovery-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         try
         {
+            var savePath = Path.Combine(root, "save", "apps.json");
+            var backupPath = savePath + ".bak";
+            var store = new Store(savePath);
+            store.Save([new() { Repo = "example/first" }]);
+            Check(!File.Exists(backupPath), "First library save needs no backup");
+            var first = File.ReadAllBytes(savePath);
+            store.Save([new() { Repo = "example/second" }]);
+            Check(first.SequenceEqual(File.ReadAllBytes(backupPath)), "Replacement preserves the first library verbatim");
+            var second = File.ReadAllBytes(savePath);
+            store.Save([new() { Repo = "example/third" }]);
+            Check(second.SequenceEqual(File.ReadAllBytes(backupPath)), "Next replacement keeps only the previous library");
+            Check(store.Load().Single().Repo == "example/third", "The current library contains the latest save");
+            Check(Directory.GetFiles(Path.GetDirectoryName(savePath)!, "apps.json*.tmp").Length == 0, "Completed library saves leave no temp files");
+
             foreach (var bad in new[] { "null", "{broken", "[{\"Repo\":\"https://invalid.test/nope\"}]", "[{\"Id\":\"cycle\",\"ParentId\":\"cycle\",\"IsGroup\":true}]" })
             {
                 var library = Path.Combine(root, "apps.json"); File.WriteAllText(library, bad);

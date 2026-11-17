@@ -117,8 +117,26 @@ public sealed class Store(string path)
         Directory.CreateDirectory(Framework.GetDirectoryName(path)!);
         var list = apps.ToList(); var data = Path.GetDirectoryName(Path.GetFullPath(path))!;
         InstalledReleaseRecords.Save(data, list);
-        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true }));
-        Framework.Move(path + ".tmp", path, true);
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            var json = JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true });
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                stream.Write(bytes, 0, bytes.Length);
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(path))
+                File.Replace(temp, path, path + ".bak");
+            else
+                File.Move(temp, path);
+        }
+        finally
+        {
+            File.Delete(temp);
+        }
         InstalledReleaseRecords.Clean(data, list);
     }
 }
