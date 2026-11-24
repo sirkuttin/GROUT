@@ -57,6 +57,7 @@ public sealed class TrackedApp
     public bool IncludePrereleases { get; set; }
     public bool ShowAllDownloads { get; set; }
     public string InstallLocation { get; set; } = "";
+    public string InstallationRegistrationId { get; set; } = "";
     public bool AutoReconcile { get; set; }
     public string UpdateMethod { get; set; } = "Manual";
     public string UpdateTarget { get; set; } = "";

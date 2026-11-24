@@ -52,6 +52,7 @@ public sealed class InstallDiscovery(Func<IReadOnlyList<InstalledRegistration>>?
     {
         var project = app.Repo.Length > 0 ? Repositories.Resolve(app.Repo).Path.Split('/').Last() : "";
         var identities = new[] { Normalize(project), AssetIdentity(app.AssetName) }.Where(n => n.Length >= 3).Distinct().ToList();
+        var configuredFolder = Environment.ExpandEnvironmentVariables(AppLocationDraft.From(app).Folder.Trim().Trim('"')).TrimEnd('\\', '/');
         var previous = (before ?? []).ToDictionary(e => e.Id, e => e);
         var found = new List<InstallationCandidate>();
         foreach (var entry in Snapshot())
@@ -59,14 +60,17 @@ public sealed class InstallDiscovery(Func<IReadOnlyList<InstalledRegistration>>?
             var name = Normalize(entry.Name); var icon = ExePath(entry.Icon); var executableName = Normalize(Path.GetFileNameWithoutExtension(icon));
             var exact = identities.Any(n => n == name || n == executableName);
             var related = identities.Any(n => n.Length >= 5 && (name.Contains(n) || n.Contains(name) && name.Length >= 5));
-            if (!exact && !related) continue;
             var folder = Environment.ExpandEnvironmentVariables(entry.Location.Trim().Trim('"')).TrimEnd('\\', '/');
             if (folder.Length == 0 && icon.Length > 0) folder = Framework.GetDirectoryName(icon) ?? "";
             if (folder.Length == 0) folder = Framework.GetDirectoryName(ExePath(entry.Uninstall)) ?? "";
             if (!Framework.IsPathFullyQualified(folder) || folder.StartsWith(@"\\") || !Directory.Exists(folder)) continue;
+            exact |= identities.Contains(Normalize(Path.GetFileName(folder)));
+            var sameFolder = string.Equals(configuredFolder, folder, StringComparison.OrdinalIgnoreCase);
+            var registered = app.InstallationRegistrationId.Length > 0 && entry.Id == app.InstallationRegistrationId;
+            if (!exact && !related && !sameFolder && !registered) continue;
             var filename = icon.Length > 0 && File.Exists(icon) && string.Equals(Framework.GetDirectoryName(icon)?.TrimEnd('\\'), folder, StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(Path.GetFileName(icon), "(?i)unins|setup|installer|update|crash") ? Path.GetFileName(icon) : "";
             var changed = before != null && (!previous.TryGetValue(entry.Id, out var old) || old != entry);
-            var score = (exact ? 100 : 55) + (changed ? 25 : 0) + (InstalledVersions.Matches(entry.Version, app.Latest) ? 10 : 0);
+            var score = (registered ? 200 : sameFolder ? 150 : exact ? 100 : 55) + (changed ? 25 : 0) + (InstalledVersions.Matches(entry.Version, app.Latest) ? 10 : 0);
             found.Add(new(entry, folder, filename, score, changed));
         }
         return found.GroupBy(c => c.Folder + "|" + c.AppFile, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(c => c.Score).First()).OrderByDescending(c => c.Score).ThenBy(c => c.Entry.Name).ToList();
@@ -76,6 +80,7 @@ public sealed class InstallDiscovery(Func<IReadOnlyList<InstalledRegistration>>?
     {
         if (!string.IsNullOrWhiteSpace(candidate.Entry.Version)) app.VersionRecord = null;
         app.InstallationLocated = true;
+        app.InstallationRegistrationId = candidate.Entry.Id;
         app.AppFolder = candidate.Folder; app.AppFile = candidate.AppFile; app.VersionSourceOverride = "";
         app.InstallLocation = candidate.AppFile.Length > 0 ? Path.Combine(candidate.Folder, candidate.AppFile) : candidate.Folder;
         app.AutoReconcile = true; InstalledVersions.Reconcile(app);
@@ -86,7 +91,7 @@ public sealed class InstallDiscovery(Func<IReadOnlyList<InstalledRegistration>>?
             app.InstalledProvenance = candidate.Entry.Version.Length > 0 ? $"Windows installed-app entry {candidate.Entry.Name} reports {candidate.Entry.Version}. Automatic file-version detection is unavailable." : $"Windows registered {candidate.Entry.Name} here, but supplied no usable version. Automatic file-version detection is unavailable.";
             InstalledVersions.Reconcile(app);
         }
-        app.InstallDiscoveryNote = $"Found {candidate.Entry.Name} in Windows installed apps: {candidate.Folder}";
+        app.InstallDiscoveryNote = "";
     }
-    public static bool CanFinish(TrackedApp app) => app.InstallationLocated && ClearMatch(app.InstallCandidates) is { } candidate && (candidate.Changed || app.IsCurrent) && InstalledVersions.CompareVersionNumbers(app.Installed, app.Latest) is not < 0 && (app.AutoReconcile || candidate.AppFile.Length > 0 && File.Exists(Path.Combine(candidate.Folder, candidate.AppFile)));
+    public static bool CanFinish(TrackedApp app) => app.InstallationLocated && ClearMatch(app.InstallCandidates) is { } candidate && (candidate.Changed || app.IsCurrent) && InstalledVersions.CompareVersionNumbers(app.Installed, app.Latest) is not < 0 && (app.AutoReconcile || File.Exists(ExePath(candidate.Entry.Icon)) && ExePath(candidate.Entry.Icon).StartsWith(candidate.Folder.TrimEnd('\\') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
 }

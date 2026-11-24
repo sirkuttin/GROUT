@@ -422,3 +422,17 @@
 ## 2026-11-09 — 0.11.0 published
 - Explicit owner publication request completed with scripts/release.csx --publish. Fresh single-EXE build, full packaged regression suite, tag/source matching and uploaded asset digest/size verification passed.
 - Published latest: https://github.com/sirkuttin/GROUT/releases/tag/v0.11.0. EXE774656bytes. Updated included backlog work to Shipped; deferred live Windows validation remains explicit. Roadmap/backlog status update is documentation-only and does not create another release.
+
+## 2026-11-23 — Retain installer registration identity
+- Owner requested fixing d2r-pcvr installation tracking at initial setup. Setup now saves the selected Windows registration ID alongside the configured location, persists it across restarts, and prefers that ID for subsequent installer matching and uninstall lookup. Adding an existing installer-managed app binds its configured folder to its registration.
+- First-install matching also checks the registered installation folder name. D2R PCVR is recognized despite the D2R VR Unleashed display name and nested Python runtime icon. Setup accepts that registered runtime as existing installation evidence without treating it as the app executable.
+- Full packaged regression suite passed, including 29 installation discovery assertions covering initial setup, saved registration reuse, uninstall lookup, persistence and ambiguous/unrelated candidates. Read-only CLI verification against the actual local registry returned D2R VR Unleashed 0.3.35 at the configured D2R PCVR folder.
+- Local portable build is outputs/fixes/installation-registration/GROUT.exe. Publication is pending.
+- Owner requested proactive follow-through as a standing preference. Added the rule to the global Codex AGENTS.md.
+
+## 2026-11-24 — 0.11.2 local build
+- Owner requested removing the positive installed-app discovery banner and building 0.11.2. Successful discovery now clears its transient note. Version mismatch and unresolved-installation messages remain actionable.
+- Version 0.11.2 includes the saved installer-registration work described above. Built with scripts/release.csx in local mode.
+
+## 2026-11-24 — 0.11.2 publication
+- Owner confirmed push and publication of 0.11.2. Publishing through scripts/release.csx with a fresh packaged build, regression suite, source/tag validation and uploaded-asset digest verification.

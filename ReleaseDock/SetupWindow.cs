@@ -206,7 +206,7 @@ public sealed class SetupWindow : Window
                     message.Text = "Checking the new repository…"; await github.VerifyRepository(source);
                 }
                 if (Repositories.Resolve(source).IsWebsite) { message.Text = "Checking website download…"; await github.Latest(source, websiteDownloadUrl: editor.WebsiteDownloadUrl); }
-                editor.Save(); ValidateInstance(); working = false; completed = true; DialogResult = true;
+                editor.Save(); BindInstallation(); ValidateInstance(); working = false; completed = true; DialogResult = true;
             }
             catch (Exception ex) { message.Text = ex.Message; }
             finally { working = false; row.IsEnabled = true; }
@@ -427,8 +427,15 @@ public sealed class SetupWindow : Window
         version.TextChanged += (_, _) => { if (version.IsKeyboardFocusWithin) automatic.IsChecked = false; };
         message = Ui.Text("", muted: true);
         var row = new WrapPanel(); row.Children.Add(Ui.Button("← Back", (_, _) => { installerCompletion = false; NewInstallScreen(); }));
-        row.Children.Add(Ui.Button("Add to library", (_, _) => { Result.InstallLocation = location.Text.Trim(); Result.Installed = version.Text.Trim(); Result.AutoReconcile = automatic.IsChecked == true; if (Result.AutoReconcile) InstalledVersions.Reconcile(Result); if (Result.PendingInstallerRelease == Result.Latest) { var chosenVersion = version.Text.Trim(); InstalledVersions.RecordAppliedInstaller(Result); if (chosenVersion.Length > 0 && !InstalledVersions.Matches(chosenVersion, Result.Latest) && Result.VersionRecord is { } record) { Result.VersionRecord = record with { Version = chosenVersion, Evidence = "Manual" }; Result.Installed = chosenVersion; Result.AutoReconcile = false; } } completed = true; DialogResult = true; }));
+        row.Children.Add(Ui.Button("Add to library", (_, _) => { Result.InstallLocation = location.Text.Trim(); Result.Installed = version.Text.Trim(); Result.AutoReconcile = automatic.IsChecked == true; BindInstallation(); if (Result.AutoReconcile) InstalledVersions.Reconcile(Result); if (Result.PendingInstallerRelease == Result.Latest) { var chosenVersion = version.Text.Trim(); InstalledVersions.RecordAppliedInstaller(Result); if (chosenVersion.Length > 0 && !InstalledVersions.Matches(chosenVersion, Result.Latest) && Result.VersionRecord is { } record) { Result.VersionRecord = record with { Version = chosenVersion, Evidence = "Manual" }; Result.Installed = chosenVersion; Result.AutoReconcile = false; } } completed = true; DialogResult = true; }));
         FixedFooter(row);
+    }
+    private void BindInstallation()
+    {
+        if (Result.UpdateMethod != "Installer") return;
+        var folder = AppLocationDraft.From(Result).Folder.TrimEnd('\\', '/');
+        var matches = installDiscovery.Find(Result).Where(c => string.Equals(c.Folder.TrimEnd('\\', '/'), folder, StringComparison.OrdinalIgnoreCase)).ToList();
+        Result.InstallationRegistrationId = InstallDiscovery.ClearMatch(matches)?.Entry.Id ?? "";
     }
     private void PickLocation(bool file)
     {

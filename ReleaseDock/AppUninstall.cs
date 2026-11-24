@@ -98,9 +98,12 @@ public static class AppUninstall
             try { return Framework.IsPathFullyQualified(a) && Framework.IsPathFullyQualified(b) && Path.GetFullPath(a).TrimEnd('\\', '/').Equals(Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase); }
             catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException) { return false; }
         }
+        var registrations = entries.ToList();
+        var saved = registrations.Where(e => e.Id == app.InstallationRegistrationId && e.Uninstall.Length > 0 && SamePath(Environment.ExpandEnvironmentVariables(e.Location.Trim().Trim('"')), folder)).ToList();
+        if (saved.Count == 1) return saved[0];
         var knownExe = draft.FileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.Combine(folder, draft.FileName) : "";
         var identities = new[] { Normalize(app.Repo.Length > 0 ? Repositories.Resolve(app.Repo).Path.Split('/').Last() : ""), Normalize(app.AppName) }.Where(n => n.Length >= 3).ToList();
-        var matches = entries.Where(e => e.Uninstall.Length > 0 &&
+        var matches = registrations.Where(e => e.Uninstall.Length > 0 &&
             (SamePath(Environment.ExpandEnvironmentVariables(e.Location.Trim().Trim('"')), folder) || SamePath(Framework.GetDirectoryName(InstallDiscovery.ExePath(e.Icon)) ?? "", folder)) &&
             (knownExe.Length > 0 ? SamePath(InstallDiscovery.ExePath(e.Icon), knownExe) : identities.Contains(Normalize(e.Name)) || identities.Contains(Normalize(Path.GetFileNameWithoutExtension(InstallDiscovery.ExePath(e.Icon))))))
             .GroupBy(e => e.Uninstall, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();

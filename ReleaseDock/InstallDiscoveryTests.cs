@@ -43,14 +43,40 @@ public static class InstallDiscoveryTests
             Check(app.AppFolder == folder && app.InstallLocation == exe && app.Installed == "3.4.1", "Registration populates exact source, folder and reported version");
             Check(!app.AutoReconcile && app.InstalledProvenance.Contains("Windows installed-app entry"), "Missing binary metadata uses explicit registry provenance rather than pretending file detection works");
             Check(InstallDiscovery.CanFinish(app), "Clear installed app can finish setup automatically");
+            Check(app.InstallationRegistrationId == entry.Id, "Applying the selected installation saves its registration identity");
+            current = [entry with { Name = "Renamed product", Icon = "", Uninstall = "uninstall-test" }];
+            Check(InstallDiscovery.ClearMatch(discovery.Find(app))?.Entry.Id == entry.Id, "Saved registration is reused even when names and icon change");
+            Check(AppUninstall.Registered(app, current)?.Id == entry.Id, "Uninstall uses the saved registration");
+            current = [entry];
             var before = current;
             current = [entry, entry with { Id = "HKLM/32/Gram" }];
             Check(discovery.Find(app, before).Count == 1, "Registry-view duplicate entries collapse to one installation");
             var secondFolder = Path.Combine(root, "SecondGram"); Directory.CreateDirectory(secondFolder); var secondExe = Path.Combine(secondFolder, "Gram.exe"); File.WriteAllText(secondExe, "app");
             current = [entry, entry with { Id = "Second", Location = secondFolder, Icon = secondExe }];
-            Check(InstallDiscovery.ClearMatch(discovery.Find(app, [])) == null, "Two equally plausible installations require a choice");
-            current = [entry with { Id = "other", Name = "Other App", Icon = Path.Combine(folder, "Other.exe") }];
-            Check(discovery.Find(app, []).Count == 0, "New unrelated app registration is never adopted just because it changed");
+            Check(InstallDiscovery.ClearMatch(discovery.Find(new TrackedApp { Repo = app.Repo, Latest = app.Latest, AssetName = app.AssetName }, [])) == null, "Two equally plausible installations require a choice");
+            current = [entry with { Id = "other", Name = "Other App", Location = secondFolder, Icon = Path.Combine(secondFolder, "Other.exe") }];
+            Check(discovery.Find(new TrackedApp { Repo = app.Repo, AssetName = app.AssetName }, []).Count == 0, "New unrelated app registration is never adopted just because it changed");
+            var renamedApp = new TrackedApp { Repo = "bearstonem/d2r-pcvr", AssetName = "D2R-PCVR-Setup-0.3.30.exe", Latest = "v0.3.35-windows-preview", InstallLocation = folder.ToUpperInvariant() + Path.DirectorySeparatorChar };
+            var renamedEntry = entry with { Name = "D2R VR Unleashed (Windows VR mod)", Version = "0.3.35", Icon = Path.Combine(folder, ".runtime", "python", "python.exe") };
+            current = [renamedEntry];
+            var renamedCandidates = discovery.Find(renamedApp);
+            Check(renamedCandidates.Count == 1 && InstallDiscovery.ClearMatch(renamedCandidates) != null, "Configured folder recognizes a renamed app with a nested runtime icon");
+            renamedApp.InstallCandidates = renamedCandidates; InstallDiscovery.Apply(renamedApp, renamedCandidates.Single());
+            Check(renamedApp.Installed == "0.3.35" && renamedApp.InstallDiscoveryNote.Length == 0, "Matching folder uses the registered version without a success message");
+            var freshFolder = Path.Combine(root, "D2R PCVR"); Directory.CreateDirectory(freshFolder);
+            var freshApp = new TrackedApp { Repo = renamedApp.Repo, AssetName = renamedApp.AssetName, Latest = renamedApp.Latest };
+            var runtime = Path.Combine(freshFolder, ".runtime", "python", "python.exe"); Directory.CreateDirectory(Path.GetDirectoryName(runtime)!); File.WriteAllText(runtime, "runtime");
+            current = [renamedEntry with { Location = freshFolder, Icon = runtime }];
+            var freshCandidates = discovery.Find(freshApp, []);
+            Check(freshCandidates.Count == 1 && freshCandidates[0].Changed && InstallDiscovery.ClearMatch(freshCandidates) != null, "First installation is discovered by its folder name despite renamed registration and runtime icon");
+            freshApp.InstallCandidates = freshCandidates; InstallDiscovery.Apply(freshApp, freshCandidates.Single());
+            Check(freshApp.AppFolder == freshFolder && freshApp.Installed == "0.3.35", "First installation gets the registered folder and version");
+            Check(InstallDiscovery.CanFinish(freshApp), "First installation can finish with a registered version and nested runtime executable");
+            var boundStore = new Store(Path.Combine(root, "bound.json")); boundStore.Save([freshApp]);
+            Check(boundStore.Load().Single().InstallationRegistrationId == renamedEntry.Id, "First installation retains its registration after restart");
+            renamedApp.InstallationRegistrationId = "";
+            current = [renamedEntry with { Location = secondFolder }];
+            Check(discovery.Find(renamedApp).Count == 0, "A different folder cannot establish an unrelated name match");
             current = [entry with { Location = "" }];
             Check(discovery.Find(app).Single().Folder == folder, "DisplayIcon supplies folder when InstallLocation is absent");
             current = [entry with { Location = "", Icon = "" }];
@@ -88,7 +114,7 @@ public static class InstallDiscoveryTests
                 Check(wizard.Result.AppFolder == folder && InstalledVersions.Matches(wizard.Result.Installed, "3.4.1") && wizard.Result.InstallationLocated, "Auto-completed wizard returns discovered installation for library addition");
                 var store = new Store(Path.Combine(root, "library.json")); store.Save([wizard.Result]);
                 Check(store.Load().Single().InstallLocation == exe, "Automatically located installation survives library persistence");
-                Check(!File.ReadAllText(Path.Combine(root, "library.json")).Contains("HKCU/64/Gram"), "Transient registry scan data is not saved into library");
+                Check(store.Load().Single().InstallationRegistrationId == entry.Id, "The installation registration survives library persistence");
             }
             finally { wizard.Close(); }
         }
