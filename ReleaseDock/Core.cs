@@ -67,7 +67,19 @@ public sealed class TrackedApp
     public string LastNotifiedTag { get; set; } = "";
     public string LastBackup { get; set; } = "";
     public string UpdateState { get; set; } = "";
-    [JsonIgnore] public string UpdateIssue => UpdateState is "Installed version detected" or "Marked installed manually" or "Previous files restored" || UpdateState.StartsWith("Portable app saved from release ", StringComparison.Ordinal) || UpdateState.StartsWith("Kept in library.", StringComparison.Ordinal) ? "" : UpdateState;
+    [JsonIgnore] public string UpdateIssue
+    {
+        get
+        {
+            if (UpdateState is "Installed version detected" or "Marked installed manually" or "Previous files restored" ||
+                UpdateState.StartsWith("Portable app saved from release ", StringComparison.Ordinal) ||
+                UpdateState.StartsWith("Kept in library.", StringComparison.Ordinal)) return "";
+            return string.Join("\n", UpdateState.Split('\n')
+                .Where(line => !(line.TrimStart().StartsWith("Found ", StringComparison.Ordinal) &&
+                    line.Contains(" in Windows installed apps: "))))
+                .Trim();
+        }
+    }
     public string DownloadedPath { get; set; } = "";
     public string DownloadedTag { get; set; } = "";
     public string InstalledProvenance { get; set; } = "";

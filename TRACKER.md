@@ -436,3 +436,8 @@
 
 ## 2026-11-24 — 0.11.2 publication
 - Owner confirmed push and publication of 0.11.2. Publishing through scripts/release.csx with a fresh packaged build, regression suite, source/tag validation and uploaded-asset digest verification.
+
+## 2026-11-24 — Correct persisted discovery success display in 0.11.3
+- Owner screenshot confirmed 0.11.2 still displayed a successful SteamlessController discovery message. Read-only inspection of the actual library confirmed it was persisted in UpdateState with a leading newline. The earlier change only suppressed newly generated discovery notes.
+- UpdateIssue now removes legacy successful Windows discovery lines before rendering, including when other actionable warnings share the saved message. Existing reconciliation removes wholly routine saved state through its normal persistence path.
+- Added UI regression assertions using serialized/reloaded legacy state, mixed warning/success content and version-mismatch messages. Publishing the correction as 0.11.3 through the verified release workflow.

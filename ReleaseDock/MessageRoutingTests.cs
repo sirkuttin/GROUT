@@ -30,6 +30,14 @@ internal static class MessageRoutingTests
             Check(!saved.Contains("ActiveOperation") && !saved.Contains("Downloading a package"), "Transient progress is not persisted as a resumable operation");
             app.ActiveOperation = ""; app.UpdateState = ""; Render();
             Check(((TextBlock)window.FindName("UpdateStateLabel")).Visibility == System.Windows.Visibility.Collapsed, "Resolved normal state has no routine progress/success message");
+            var legacy = new TrackedApp { Repo = app.Repo, UpdateState = "\nFound SteamlessController version 1.25 in Windows installed apps: C:\\Program Files\\SteamlessController" };
+            var restored = JsonSerializer.Deserialize<TrackedApp>(JsonSerializer.Serialize(legacy))!;
+            app.UpdateState = restored.UpdateState; Render();
+            Check(((TextBlock)window.FindName("UpdateStateLabel")).Visibility == System.Windows.Visibility.Collapsed, "Previously saved discovery success is hidden after reload");
+            app.UpdateState = "Installation not verified — recheck the version or mark it manually" + restored.UpdateState; Render();
+            Check(((TextBlock)window.FindName("UpdateStateLabel")).Text == "Installation not verified — recheck the version or mark it manually", "Legacy success is removed while a separate installation warning remains visible");
+            app.UpdateState = "Found App, but it still reports 1.0. The expected release is 2.0."; Render();
+            Check(((TextBlock)window.FindName("UpdateStateLabel")).Text == app.UpdateState, "Discovery version mismatch remains visible");
             var self = (TextBlock)window.FindName("SelfUpdateLabel"); self.Text = new string('x', 1000); self.Measure(new System.Windows.Size(10000, 100));
             Check(self.DesiredSize.Width <= 246 && self.TextTrimming == System.Windows.TextTrimming.CharacterEllipsis, "Self-update feedback cannot expand footer without bound");
         }
